@@ -23,8 +23,9 @@ async function syncToCloud() {
             },
             body: JSON.stringify({ highlights: pending })
         });
-
+         
         if (res.ok) markAsSynced(pending);
+        console.log("RESPONSE: ", res.status, res.ok);
     };
 }
 

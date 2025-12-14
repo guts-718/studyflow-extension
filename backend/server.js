@@ -38,4 +38,10 @@ app.post("/sync/highlights", async (req, res) => {
     res.status(200).json({ success: true });
 });
 
+app.get("/files", async (req, res) => {
+    const files = await Highlight.distinct("file");
+    res.json(files);
+});
+
+
 app.listen(PORT, () => console.log("API running on 3000"));

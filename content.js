@@ -5,6 +5,7 @@
 
 let toolbar;
 let activeFile = null;
+let activePage = location.href;
 let savedRange = null;
 
 const existingFiles = [
@@ -13,6 +14,29 @@ const existingFiles = [
   "OS – Deadlocks"
 ];
 
+async function loadFileNames() {
+    if (navigator.onLine) {
+        try {
+            const res = await fetch("http://localhost:3000/files");
+            const files = await res.json();
+            if (files.length) return files;
+        } catch (e) {
+            console.warn("Online fetch failed, falling back");
+        }
+    }
+
+    // Offline fallback
+    const db = await openDB();
+    const tx = db.transaction("files", "readonly");
+    const store = tx.objectStore("files");
+
+    return new Promise(resolve => {
+        store.getAll().onsuccess = e => {
+            const local = e.target.result.map(f => f.name);
+            resolve(local.length ? local : ["Biology", "DSA", "OS"]);
+        };
+    });
+}
 
 
 const DB_NAME="study_highlighter_db";
@@ -22,6 +46,8 @@ const STORE_NAME="Highlights";
 function openDB(){
     return new Promise((resolve, reject)=>{
         const req = indexedDB.open(DB_NAME,DB_VERSION);
+        
+        db.createObjectStore("files", { keyPath: "name" });
 
         req.onupgradeneeded = () => {
             const db = req.result;
@@ -34,6 +60,13 @@ function openDB(){
         req.onerror = () => reject(req.error);
     })
 }
+
+async function saveFileLocally(fileName) {
+    const db = await openDB();
+    const tx = db.transaction("files", "readwrite");
+    tx.objectStore("files").put({ name: fileName });
+}
+
 
 async function persistHighlight(data){
     const db=await openDB();
@@ -112,32 +145,34 @@ function showToolbar(rect, text) {
                 yellow: "#fff3b0"
             };
 
-            if(!activeFile){
+           if (!activeFile) {
                 showFileChooser((fileName) => {
-                            activeFile = fileName;
-                            applyHighlight(colorMap[c.name]);
-                            console.log("FILE:", activeFile);
-                            console.log("TEXT:", text);
-                            console.log("COLOR:", c.name);
-                            removeToolbar();
-                        });
-                
-                const highlightData = {
-                    id: crypto.randomUUID(),
-                    userId: "dev-user", // temporary
-                    file: activeFile,
-                    text,
-                    color: c.name,
-                    url: location.href,
-                    timestamp: Date.now(),
-                    clientId: crypto.randomUUID(),
-                    syncStatus: "pending"
-                };
+                    activeFile = fileName;
+                    saveFileLocally(fileName);
+ 
+                    const highlightData = {
+                        id: crypto.randomUUID(),
+                        userId: "dev-user",
+                        file: activeFile,   // now correct
+                        text,
+                        color: c.name,
+                        url: location.href,
+                        timestamp: Date.now(),
+                        clientId: crypto.randomUUID(),
+                        syncStatus: "pending"
+                    };
 
-                persistHighlight(highlightData);
+                    persistHighlight(highlightData);
+                    saveAndSync(text, c.name);
+                    applyHighlight(colorMap[c.name]);
+                    removeToolbar();
+                });
 
+                return; // Important: prevent premature save
+            
             }else{
                 applyHighlight(colorMap[c.name]);
+                saveAndSync(text, c.name);
                 console.log("FILE:", activeFile);
                 console.log("TEXT:", text);
                 console.log("COLOR:", c.name);
@@ -178,11 +213,23 @@ async function syncToCloud() {
             body: JSON.stringify({ highlights: pending })
         });
 
-        if (res.ok) {
+        if (res.ok || res.status==200) {
             markAsSynced(pending);
             console.log("Synced to MongoDB");
         }
     };
+}
+
+
+async function markAsSynced(highlights) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+
+    highlights.forEach(h => {
+        h.syncStatus = "synced";
+        store.put(h);
+    });
 }
 
 
@@ -193,62 +240,75 @@ function saveHighlight(text, color) {
     removeToolbar();
 }
 
+async function showFileChooser(onSelect) {
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.top = 0;
+    overlay.style.left = 0;
+    overlay.style.height = "100%";
+    overlay.style.width = "100%";
+    overlay.style.background = "rgba(0,0,0,0.4)";
+    overlay.style.zIndex = "99999";
 
-function showFileChooser(onSelect){
-    const overlay=document.createElement("div");
-    overlay.style.position="fixed";
-    overlay.style.top=0;
-    overlay.style.left=0;
-    overlay.style.height="100%";
-    overlay.style.width="100%";
-    overlay.style.background="rgba(0,0,0,0.4)";
-    overlay.style.zIndex="99999";
+    const modal = document.createElement("div");
+    modal.style.background = "#fff";
+    modal.style.padding = "16px";
+    modal.style.borderRadius = "8px";
+    modal.style.width = "300px";
+    modal.style.margin = "20vh auto";
+    modal.style.display = "flex";
+    modal.style.flexDirection = "column";
+    modal.style.gap = "8px";
 
-    const modal=document.createElement("div");
-    modal.style.background="#fff";
-    modal.style.padding="16px";
-    modal.style.borderRadius="8px";
-    modal.style.width="300px";
-    modal.style.margin="20vh auto";
-    modal.style.display="flex";
-    modal.style.flexDirection="column";
-    modal.style.gap="8px";
-
-    const input=document.createElement("input");
-    input.placeholder="Create new file....";
-    input.style.padding="6px";
+    const input = document.createElement("input");
+    input.placeholder = "Create new file...";
+    input.style.padding = "6px";
 
     const select = document.createElement("select");
     select.style.padding = "6px";
 
-    const defaultOpt=document.createElement("option");
-    defaultOpt.value="";
-    defaultOpt.textContent="Select existing file";
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Select existing file";
     select.appendChild(defaultOpt);
 
-    existingFiles.forEach(f=>{
-        const opt=document.createElement("option");
-        opt.value=f;
-        opt.textContent=f;
-        select.appendChild(opt);
-    })
-
-    const btn=document.createElement("button");
-    btn.textContent="Confirm";
     
-    btn.onclick=()=>{
-        const value=input.value.trim() || select.value;
-        if(!value) return alert("Select or enter a file name");
+    const files = await loadFileNames();
+
+    files.forEach(f => {
+    const opt = document.createElement("option");
+    opt.value = f;
+    opt.textContent = f;
+    select.appendChild(opt);
+    });
+   
+
+    const btn = document.createElement("button");
+    btn.textContent = "Confirm";
+
+    btn.onclick = () => {
+        const newFile = input.value.trim();
+        const existingFile = select.value;
+        
+        const finalValue = newFile || (existingFile !== "" ? existingFile : null);
+
+        if (!finalValue) {
+            alert("Select or enter a file name");
+            return;
+        }
 
         overlay.remove();
-        onSelect(value);
-
-    }
+        onSelect(finalValue);
+    };
 
     modal.append(input, select, btn);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 }
+
+
+
+
 function removeToolbar() {
     if (toolbar) {
         toolbar.remove();
