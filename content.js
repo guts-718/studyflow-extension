@@ -14,6 +14,34 @@ const existingFiles = [
 ];
 
 
+
+const DB_NAME="study_highlighter_db";
+const DB_VERSION=1;
+const STORE_NAME="Highlights";
+
+function openDB(){
+    return new Promise((resolve, reject)=>{
+        const req = indexedDB.open(DB_NAME,DB_VERSION);
+
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if(!db.objectStoreNames.contains(STORE_NAME)){
+                db.createObjectStore(STORE_NAME, {keyPath: "id"})
+            }
+        };
+
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    })
+}
+
+async function persistHighlight(data){
+    const db=await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store=tx.objectStore(STORE_NAME);
+
+    store.put(data);
+}
 document.addEventListener("selectionchange", () => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -93,6 +121,21 @@ function showToolbar(rect, text) {
                             console.log("COLOR:", c.name);
                             removeToolbar();
                         });
+                
+                const highlightData = {
+                    id: crypto.randomUUID(),
+                    userId: "dev-user", // temporary
+                    file: activeFile,
+                    text,
+                    color: c.name,
+                    url: location.href,
+                    timestamp: Date.now(),
+                    clientId: crypto.randomUUID(),
+                    syncStatus: "pending"
+                };
+
+                persistHighlight(highlightData);
+
             }else{
                 applyHighlight(colorMap[c.name]);
                 console.log("FILE:", activeFile);
@@ -113,6 +156,35 @@ function showToolbar(rect, text) {
 
     document.body.appendChild(toolbar);
 }
+
+
+async function syncToCloud() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+
+    store.getAll().onsuccess = async (e) => {
+        const pending = e.target.result.filter(
+            h => h.syncStatus === "pending"
+        );
+
+        if (!pending.length) return;
+
+        const res = await fetch("http://localhost:4109/sync/highlights", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ highlights: pending })
+        });
+
+        if (res.ok) {
+            markAsSynced(pending);
+            console.log("Synced to MongoDB");
+        }
+    };
+}
+
 
 function saveHighlight(text, color) {
     console.log("FILE:", activeFile);
@@ -185,6 +257,42 @@ function removeToolbar() {
 }
 
 
+window.addEventListener("load", async () => {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+
+    store.getAll().onsuccess = (e) => {
+        const highlights = e.target.result;
+
+        highlights
+            .filter(h => h.url === location.href)
+            .forEach(h => {
+                reapplyHighlight(h);
+            });
+    };
+});
+
+function reapplyHighlight(h){
+    const bodyText = document.body.innerHTML;
+    if(!bodyText.includes(h.text))return;
+
+    document.body.innerHTML = document.body.innerHTML.replace(
+        h.text, `<span style="background-color:${colorMap(h.color)};padding:2px;border-radius:3px;">${h.text}</span>`
+    )
+
+    function colorMap(color){
+        return {
+            red: "#ffcccc",
+            orange: "#ffe0b3",
+            yellow: "#fff3b0"
+        }[color];
+    }
+}
+
+
+syncToCloud();
+window.addEventListener("online", syncToCloud);
 
 
 /*
