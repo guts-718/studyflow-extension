@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
+import authMiddleware from "./middlewares/auth.js"
 
 dotenv.config();
 
@@ -43,5 +44,24 @@ app.get("/files", async (req, res) => {
     res.json(files);
 });
 
+app.get("/highlights", authMiddleware, async (req, res) => {
+    const highlights = await Highlight.find({
+        userId: req.user.userId
+    });
+    res.json(highlights);
+});
+
+
+
+app.post("/sync/highlights", authMiddleware, async (req, res) => {
+    const userId = req.user.userId;
+    const highlights = req.body.highlights.map(h => ({
+        ...h,
+        userId
+    }));
+
+    await Highlight.insertMany(highlights, { ordered: false });
+    res.json({ success: true });
+});
 
 app.listen(PORT, () => console.log(`API running on ${PORT}`));
