@@ -3,6 +3,11 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import authMiddleware from "./middlewares/auth.js"
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+import User from "./models/User.js";
+import RefreshToken from "./models/RefreshToken.js";
+import {signAccessToken} from  "./utils/jwt.js";
 
 dotenv.config();
 
@@ -62,6 +67,98 @@ app.post("/sync/highlights", authMiddleware, async (req, res) => {
 
     await Highlight.insertMany(highlights, { ordered: false });
     res.json({ success: true });
+});
+
+
+
+app.post("/auth/signup", async (req, res) => {
+    const { email, password, deviceId } = req.body;
+    console.log("email, password, device", email, password, deviceId);
+
+    try {
+        const existing = await User.findOne({ email });
+        if (existing) {
+            console.log(email, password, deviceId, existing);
+            return res.status(409).json({ error: "Unable to create account" });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        console.log("passhash",passwordHash);
+        const user = await User.create({ email, passwordHash });
+        console.log("user: ",user);
+        console.log("user_id: ",user._id);
+        console.log("signactiontoken",signAccessToken);
+        const accessToken = signAccessToken(user._id);
+        console.log("access: ",accessToken);
+        
+        const refreshTokenRaw = crypto.randomBytes(64).toString("hex");
+        console.log("refresh, ", refreshTokenRaw); 
+        const refreshTokenHash = await bcrypt.hash(refreshTokenRaw, 12);
+        console.log("refreshtokenhash", refreshTokenHash);
+
+        await RefreshToken.create({
+            userId: user._id,
+            tokenHash: refreshTokenHash,
+            deviceId,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
+
+        res.json({ accessToken, refreshToken: refreshTokenRaw });
+    } catch(e){
+        res.status(500).json({ error: "Signup failed", messageError:e });
+    }
+});
+
+
+app.post("/auth/login", async (req, res) => {
+    const { email, password, deviceId } = req.body;
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ error: "Invalid email or password" });
+        }
+
+        const ok = await bcrypt.compare(password, user.passwordHash);
+        if (!ok) {
+            return res.status(401).json({ error: "Invalid email or password" });
+        }
+
+        const accessToken = signAccessToken(user._id);
+
+        const refreshTokenRaw = crypto.randomBytes(64).toString("hex");
+        const refreshTokenHash = await bcrypt.hash(refreshTokenRaw, 12);
+
+        await RefreshToken.create({
+            userId: user._id,
+            tokenHash: refreshTokenHash,
+            deviceId,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
+
+        res.json({ accessToken, refreshToken: refreshTokenRaw });
+    } catch {
+        res.status(500).json({ error: "Login failed" });
+    }
+});
+
+
+
+app.post("/auth/refresh", async (req, res) => {
+    const { deviceId, refreshToken } = req.body;
+
+    const record = await RefreshToken.findOne({ deviceId });
+    if (!record || record.expiresAt < new Date()) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const ok = await bcrypt.compare(refreshToken, record.tokenHash);
+    if (!ok) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const accessToken = signAccessToken(record.userId);
+    res.json({ accessToken });
 });
 
 app.listen(PORT, () => console.log(`API running on ${PORT}`));
