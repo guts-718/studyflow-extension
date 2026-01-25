@@ -1,41 +1,284 @@
-PORT=4109;
-async function syncToCloud() {
+// await something(); // this crashes service worker - error = Service worker registration failed. Status code: 15
+// const token = await new Promise(resolve => { chrome.storage.local.get("accessToken", res => resolve(res.accessToken));}); - this caused the creash
+// background have auth, fetch and refresh
+
+/*
+from content.js
+const DB_NAME="study_highlighter_db";
+const DB_VERSION = 2;
+const STORE_NAME="Highlights";
+
+PORT=4209
+
+*
+
+/*
+authenticatedFetch - getFromStorage, refreshAccessToken
+syncToCloud - authenticatedFetch [post] and then markAsSynced
+refreshAccessToken
+
+
+
+
+*/
+const PORT=4109;
+const DB_NAME = "study_highlighter_db";
+const DB_VERSION = 3;
+const STORE_NAME = "items";
+
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+        req.onupgradeneeded = () => {
+            const db = req.result;
+
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: "id" });
+            }
+        };
+
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+
+async function saveItem(item) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(item);
+}
+
+async function getFilesFromCloud() {
+    const res = await authenticatedFetch(
+        "http://localhost:4109/files"
+    );
+    return res.json();
+}
+
+
+async function getAllItems() {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
 
-    const pending = [];
-
-    store.getAll().onsuccess = async (e) => {
-        e.target.result.forEach(h => {
-            if (h.syncStatus === "pending") {
-                pending.push(h);
-            }
-        });
-
-        if (!pending.length) return;
-
-        const res = await fetch(`https://localhost:${PORT}/sync/highlights`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer DEV-TOKEN"
-            },
-            body: JSON.stringify({ highlights: pending })
-        });
-         
-        if (res.ok) markAsSynced(pending);
-        console.log("RESPONSE: ", res.status, res.ok);
-    };
+    return new Promise(resolve => {
+        store.getAll().onsuccess = e => resolve(e.target.result);
+    });
 }
 
-async function markAsSynced(highlights) {
+
+async function getNotesForUrlAndFile(url, file) {
+    const all = await getAllItems();
+
+    return all.filter(i =>
+        i.type === "note" &&
+        i.url === url &&
+        i.file === file
+    );
+}
+
+
+async function deleteNotesForUrlAndFile(url, file) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
 
-    highlights.forEach(h => {
-        h.syncStatus = "synced";
-        store.put(h);
+    const all = await getAllItems();
+    all.forEach(i => {
+        if (i.type === "note" && i.url === url && i.file === file) {
+            store.delete(i.id);
+        }
     });
 }
+
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+
+    (async () => {
+
+        if (msg.type === "SAVE_ITEM") {
+          await saveItem(msg.data);
+        // Opportunistic sync
+            try {
+                await syncPendingItemsToCloud();
+            } catch (e) {
+                console.warn("Sync skipped:", e);
+            }
+
+            sendResponse({ ok: true });
+        }
+
+        if (msg.type === "GET_ALL_ITEMS") {
+            const items = await getAllItems();
+            sendResponse({ ok: true, data: items });
+        }
+
+        if (msg.type === "GET_NOTES_FOR_URL_FILE") {
+            const notes = await getNotesForUrlAndFile(msg.url, msg.file);
+            sendResponse({ ok: true, data: notes });
+        }
+
+        if (msg.type === "DELETE_NOTES_FOR_URL_FILE") {
+            await deleteNotesForUrlAndFile(msg.url, msg.file);
+            sendResponse({ ok: true });
+        }
+
+        if (msg.type === "SET_AUTH") {
+            await chrome.storage.local.set({
+                accessToken: msg.accessToken,
+                refreshToken: msg.refreshToken
+            });
+            sendResponse({ ok: true });
+        }
+
+        if (msg.type === "GET_FILES") {
+            try {
+                const files = await getFilesFromCloud();
+                sendResponse({ ok: true, data: files });
+            } catch {
+                sendResponse({ ok: true, data: [] });
+            }
+        }
+
+
+
+    })();
+
+    return true; // keep channel open
+});
+
+
+async function syncPendingItemsToCloud() {
+    const items = await getAllItems();
+    const pending = items.filter(i => i.syncStatus === "pending");
+
+    if (!pending.length) return;
+
+    const res = await authenticatedFetch(
+        "http://localhost:4109/sync/items",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: pending })
+        }
+    );
+
+    if (!res.ok) throw new Error("Sync failed");
+
+    // mark as synced
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+
+    pending.forEach(i => {
+        i.syncStatus = "synced";
+        store.put(i);
+    });
+}
+
+
+async function authenticatedFetch(url, options = {}) {
+    let accessToken = await getFromStorage("accessToken");
+    console.log("accessToken ", accessToken);
+    
+    const doFetch = async (token) => {
+        return fetch(url, {
+            ...options,
+            headers: {
+                ...(options.headers || {}),
+                Authorization: "Bearer " + token
+            }
+        });
+    };
+
+    let res = await doFetch(accessToken);
+
+    if (res.status !== 401) {
+        return res; // if valid then siimply return else we need to do silent refresh
+    }
+
+    try {
+        const newToken = await refreshAccessToken();
+        return await doFetch(newToken);
+    } catch (err) {
+        // refresh failed so we force logout
+        await chrome.storage.local.clear();
+        throw err;
+    }
+}
+
+
+
+
+async function refreshAccessToken() {
+    const deviceId = await getFromStorage("deviceId");
+    const refreshToken = await getFromStorage("refreshToken");
+
+    if (!deviceId || !refreshToken) {
+        throw new Error("No refresh credentials");
+    }
+
+    const res = await fetch(`http://localhost:${PORT}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, refreshToken })
+    });
+
+    if (!res.ok) {
+        throw new Error("Refresh failed");
+    }
+
+    const { accessToken } = await res.json();
+    await setInStorage({ accessToken });
+    return accessToken;
+}
+
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "AUTH_FETCH") {
+        authenticatedFetch(msg.url, msg.options)
+            .then(async res => {
+                const data = await res.json();
+                sendResponse({ ok: true, data });
+            })
+            .catch(err => {
+                sendResponse({ ok: false, error: err.message });
+            });
+        return true; // async
+    }
+});
+
+
+
+
+function getFromStorage(key) {
+    return new Promise(resolve => {
+        chrome.storage.local.get(key, res => resolve(res[key]));
+    });
+}
+
+function setInStorage(obj) {
+    return new Promise(resolve => {
+        chrome.storage.local.set(obj, resolve);
+    });
+}
+
+
+
+
+
+/*
+
+
+
+
+fetch("/protected-endpoint", {
+    headers: {
+        Authorization: "Bearer " + token
+    }
+});
+
+*/

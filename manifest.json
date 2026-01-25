@@ -3,11 +3,32 @@
   "name": "Study Highlighter",
   "version": "0.1",
   "description": "Highlight and save study notes",
-  "permissions": ["activeTab"],
+
+  "permissions": ["storage"],
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["db.js", "content.js"],
+      "run_at": "document_end"
     }
-  ]
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png"
+    }
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
 }

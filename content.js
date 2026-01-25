@@ -2,79 +2,86 @@
 // window.getSelection().getRangeAt(0)
 // window.getSelection().getRangeAt(0).getBoundingClientRect()
 
+// importScripts("db.js"); // MV3-compatible
 
 let toolbar;
 let activeFile = null;
 let activePage = location.href;
 let savedRange = null;
-
+const PORT=4109;
 const existingFiles = [
   "Biology – Cell Division",
   "DSA – Trees",
   "OS – Deadlocks"
 ];
 
-async function loadFileNames() {
-    if (navigator.onLine) {
-        try {
-            const res = await fetch("http://localhost:3000/files");
-            const files = await res.json();
-            if (files.length) return files;
-        } catch (e) {
-            console.warn("Online fetch failed, falling back");
-        }
-    }
+window.addEventListener("online", syncToCloud);
 
-    // Offline fallback
-    const db = await openDB();
-    const tx = db.transaction("files", "readonly");
-    const store = tx.objectStore("files");
+/*
+old - chrome.storage.local.get("token", callback);
+new promised based - await chrome.storage.local.get("token");
+console.log("chrome is", chrome);
+console.log("chrome.storage is", chrome.storage);
 
-    return new Promise(resolve => {
-        store.getAll().onsuccess = e => {
-            const local = e.target.result.map(f => f.name);
-            resolve(local.length ? local : ["Biology", "DSA", "OS"]);
-        };
+Promise-based works ONLY if:
+
+Manifest V3
+
+Chrome ≥ certain version
+
+Correct execution context
+
+openDB, store_name and indexed db should all be here in content.js
+
+*/
+function getToken() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get("token", (res) => {
+            resolve(res.token);
+        });
     });
 }
 
 
-const DB_NAME="study_highlighter_db";
-const DB_VERSION=1;
-const STORE_NAME="Highlights";
-
-function openDB(){
-    return new Promise((resolve, reject)=>{
-        const req = indexedDB.open(DB_NAME,DB_VERSION);
-        
-        db.createObjectStore("files", { keyPath: "name" });
-
-        req.onupgradeneeded = () => {
-            const db = req.result;
-            if(!db.objectStoreNames.contains(STORE_NAME)){
-                db.createObjectStore(STORE_NAME, {keyPath: "id"})
-            }
-        };
-
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    })
-}
-
-async function saveFileLocally(fileName) {
-    const db = await openDB();
-    const tx = db.transaction("files", "readwrite");
-    tx.objectStore("files").put({ name: fileName });
+function bgRequest(message) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(message, res => {
+            if (!res || !res.ok) reject();
+            else resolve(res.data);
+        });
+    });
 }
 
 
-async function persistHighlight(data){
-    const db=await openDB();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store=tx.objectStore(STORE_NAME);
 
-    store.put(data);
+
+
+
+async function loadFileNames() {
+    try {
+        const files = await bgRequest({
+            type: "GET_FILES"
+        });
+
+        if (files && files.length) {
+            return files;
+        }
+    } catch (e) {
+        console.warn("Failed to load files:", e);
+    }
+
+    // last-resort fallback
+    return ["Biology", "DSA", "OS"];
 }
+
+
+
+// window.addEventListener("load", () => {
+//     hydrateIndexedDBFromCloud();
+//     syncToCloud();
+// });
+
+
 document.addEventListener("selectionchange", () => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -105,11 +112,14 @@ function applyHighlight(color) {
 
     savedRange = null;
 }
+// async function saveFileLocally(fileName) {
+//     const db = await openDB();
+//     const tx = db.transaction("files", "readwrite");
+//     tx.objectStore("files").put({ name: fileName });
+// }
 
 
 function showToolbar(rect, text) {
-    console.log("just inside the main function:", text);
-
     removeToolbar();
 
     toolbar = document.createElement("div");
@@ -124,9 +134,9 @@ function showToolbar(rect, text) {
     toolbar.style.zIndex = "555555";
 
     const colors = [
-        { name: "red", color: "#ff4d4d" },
-        { name: "orange", color: "#ffa500" },
-        { name: "yellow", color: "#ffd700" }
+        { name: "red", color: "#ff4d4d", bg: "#ffcccc" },
+        { name: "orange", color: "#ffa500", bg: "#ffe0b3" },
+        { name: "yellow", color: "#ffd700", bg: "#fff3b0" }
     ];
 
     colors.forEach(c => {
@@ -139,97 +149,99 @@ function showToolbar(rect, text) {
         btn.style.background = c.color;
 
         btn.onclick = () => {
-            const colorMap = {
-                red: "#ffcccc",
-                orange: "#ffe0b3",
-                yellow: "#fff3b0"
-            };
-
-           if (!activeFile) {
+            // First highlight on this page adn then ask for file
+            if (!activeFile) {
                 showFileChooser((fileName) => {
                     activeFile = fileName;
                     saveFileLocally(fileName);
- 
-                    const highlightData = {
-                        id: crypto.randomUUID(),
-                        userId: "dev-user",
-                        file: activeFile,   // now correct
-                        text,
-                        color: c.name,
-                        url: location.href,
-                        timestamp: Date.now(),
-                        clientId: crypto.randomUUID(),
-                        syncStatus: "pending"
-                    };
 
-                    persistHighlight(highlightData);
-                    saveAndSync(text, c.name);
-                    applyHighlight(colorMap[c.name]);
+                    applyHighlight(c.bg);
                     removeToolbar();
+                    saveAndSync(text, c.name);
                 });
-
-                return; // Important: prevent premature save
-            
-            }else{
-                applyHighlight(colorMap[c.name]);
-                saveAndSync(text, c.name);
-                console.log("FILE:", activeFile);
-                console.log("TEXT:", text);
-                console.log("COLOR:", c.name);
-                removeToolbar();
+                return;
             }
-            // alert("button clicked");
-            // console.log("highlighted text:", text);
-            // console.log("color:", c.name);
-            // removeToolbar();
+
+            // Subsequent highlights on same page
+            applyHighlight(c.bg);
+            removeToolbar();
+            saveAndSync(text, c.name);
         };
 
         toolbar.appendChild(btn);
     });
 
-
-
     document.body.appendChild(toolbar);
 }
 
 
-async function syncToCloud() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
+async function saveAndSync(text, color) {
+    if (!activeFile) {
+        console.warn("saveAndSync called without activeFile");
+        return;
+    }
 
-    store.getAll().onsuccess = async (e) => {
-        const pending = e.target.result.filter(
-            h => h.syncStatus === "pending"
-        );
+    const highlightData = {
+        id: crypto.randomUUID(),
+        clientId: crypto.randomUUID(),
+        type: "highlight",
+        file: activeFile,
+        url: location.href,
+        text,
+        color,
+        timestamp: Date.now(),
+        syncStatus: "pending"
+    };
 
-        if (!pending.length) return;
-
-        const res = await fetch("http://localhost:4109/sync/highlights", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ highlights: pending })
+    try {
+        await bgRequest({
+            type: "SAVE_ITEM",
+            data: highlightData
         });
 
-        if (res.ok || res.status==200) {
-            markAsSynced(pending);
-            console.log("Synced to MongoDB");
-        }
-    };
+        console.log("Highlight saved:", highlightData);
+    } catch (err) {
+        console.error("Failed to save highlight", err);
+    }
 }
 
 
-async function markAsSynced(highlights) {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
 
-    highlights.forEach(h => {
-        h.syncStatus = "synced";
-        store.put(h);
-    });
+
+
+   
+async function hydrateIndexedDBFromCloud() {
+    if (!navigator.onLine) return;
+
+    try {
+        const cloudHighlights = await authFetch(
+            `http://localhost:${PORT}/highlights`
+        );
+
+        if (!Array.isArray(cloudHighlights)) return;
+
+        for (const h of cloudHighlights) {
+            const exists = await highlightExists(h.clientId);
+            if (!exists) {
+                await persistHighlight({
+                    id: crypto.randomUUID(),
+                    userId: h.userId,
+                    type: h.type,
+                    file: h.file,
+                    text: h.text,
+                    color: h.color,
+                    url: h.url,
+                    timestamp: h.timestamp,
+                    clientId: h.clientId,
+                    syncStatus: "synced"
+                });
+            }
+        }
+
+        console.log("Hydration complete");
+    } catch (err) {
+        console.warn("Hydration failed:", err);
+    }
 }
 
 
@@ -317,21 +329,21 @@ function removeToolbar() {
 }
 
 
-window.addEventListener("load", async () => {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
+// window.addEventListener("load", async () => {
+//     const db = await openDB();
+//     const tx = db.transaction(STORE_NAME, "readonly");
+//     const store = tx.objectStore(STORE_NAME);
 
-    store.getAll().onsuccess = (e) => {
-        const highlights = e.target.result;
+//     store.getAll().onsuccess = (e) => {
+//         const highlights = e.target.result;
 
-        highlights
-            .filter(h => h.url === location.href)
-            .forEach(h => {
-                reapplyHighlight(h);
-            });
-    };
-});
+//         highlights
+//             .filter(h => h.url === location.href)
+//             .forEach(h => {
+//                 reapplyHighlight(h);
+//             });
+//     };
+// });
 
 function reapplyHighlight(h){
     const bodyText = document.body.innerHTML;
@@ -350,9 +362,30 @@ function reapplyHighlight(h){
     }
 }
 
+// function authFetch(url, options = {}) {
+//     return new Promise((resolve, reject) => {
+//         chrome.runtime.sendMessage(
+//             { type: "AUTH_FETCH", url, options },
+//             (res) => {
+//                 if (!res || !res.ok) reject(res?.error);
+//                 else resolve(res.data);
+//             }
+//         );
+//     });
+// }
 
-syncToCloud();
-window.addEventListener("online", syncToCloud);
+// async function getToken(){
+//     return await new Promise(resolve => { 
+//     chrome.storage.local.get("accessToken",
+//          res => resolve(res.accessToken)
+//      ); 
+// });
+//}
+
+//// const token =  getToken();
+
+// syncToCloud(token);
+
 
 
 /*
