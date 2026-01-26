@@ -4,7 +4,7 @@
   "version": "0.1",
   "description": "Highlight and save study notes",
 
-  "permissions": ["storage"],
+  "permissions": ["storage","tabs"],
 
   "content_scripts": [
     {

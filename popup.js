@@ -5,34 +5,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const { accessToken } = await chrome.storage.local.get("accessToken");
 
     if (accessToken) {
+        
         showNotesUI();
         initNotes();
+        
     } else {
         showAuthUI();
         initAuth();
     }
 });
 
-// function openDB() {
-//     return new Promise((resolve, reject) => {
-//         const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-//         req.onupgradeneeded = () => {
-//             const db = req.result;
-
-//             if (!db.objectStoreNames.contains(STORE_NAME)) {
-//                 db.createObjectStore(STORE_NAME, { keyPath: "id" });
-//             }
-
-//             if (!db.objectStoreNames.contains("files")) {
-//                 db.createObjectStore("files", { keyPath: "name" });
-//             }
-//         };
-
-//         req.onsuccess = () => resolve(req.result);
-//         req.onerror = () => reject(req.error);
-//     });
-// }
 
 function bgRequest(message) {
     return new Promise((resolve, reject) => {
@@ -97,6 +79,16 @@ function initAuth() {
     });
 }
 
+function getActiveTab() {
+    return new Promise(resolve => {
+        chrome.tabs.query(
+            { active: true, currentWindow: true },
+            tabs => resolve(tabs[0])
+        );
+    });
+}
+
+
 
 async function initNotes() {
     const urlDisplay = document.getElementById("urlDisplay");
@@ -106,25 +98,32 @@ async function initNotes() {
     const clearButton = document.getElementById("clearButton");
     const allNotesButton = document.getElementById("allNotesButton");
 
-    // 1️⃣ Get current tab URL
-    const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true
-    });
+    // 1️⃣ Get active tab
+    const tab = await getActiveTab().then((x)=>x.url)
+    console.log("tab:", tab);
 
-    const pageUrl = tab.url;
+    if (!tab) {
+        console.error("Could not get active tab");
+        return;
+    }
+
+    const pageUrl = tab;
+    console.log("pageUrl:", pageUrl);
     urlDisplay.textContent = pageUrl;
 
-    // 2️⃣ Load active file for this URL
-    const { activeFileByUrl = {} } =
-        await chrome.storage.local.get("activeFileByUrl");
+    // 2️⃣ Load activeFileByUrl
+    const result = await new Promise(resolve => {
+        chrome.storage.local.get("activeFileByUrl", resolve);
+    });
+
+    const activeFileByUrl = result.activeFileByUrl || {};
 
     const existingFile = activeFileByUrl[pageUrl];
     if (existingFile) {
-        fileInput.value = existingFile;
+        fileInput.value = existingFile;   // ✅ correct
     }
 
-    // 3️⃣ Load existing note from BACKGROUND DB
+    // 3️⃣ Load existing note
     if (existingFile) {
         const notes = await bgRequest({
             type: "GET_NOTES_FOR_URL_FILE",
@@ -137,7 +136,7 @@ async function initNotes() {
         }
     }
 
-    // 4️⃣ Save / Update note
+    // 4️⃣ Save note
     saveButton.onclick = async () => {
         const file = fileInput.value.trim();
         const text = noteInput.value.trim();
@@ -147,7 +146,6 @@ async function initNotes() {
             return;
         }
 
-        // remember file selection
         activeFileByUrl[pageUrl] = file;
         await chrome.storage.local.set({ activeFileByUrl });
 
@@ -184,13 +182,14 @@ async function initNotes() {
         noteInput.value = "";
     };
 
-    // 6️⃣ Open All Notes page
+    // 6️⃣ Open all notes
     allNotesButton.onclick = () => {
         chrome.tabs.create({
             url: chrome.runtime.getURL("notes.html")
         });
     };
 }
+
 
 
 
@@ -214,33 +213,18 @@ async function getOrCreateDeviceId() {
     return deviceId;
 }
 
+/*
+Chrome extension APIs are mostly callback-based, not promise-based (unless you use polyfills).
+function chromePromise(fn) {
+    return (...args) =>
+        new Promise(resolve =>
+            fn(...args, resolve)
+        );
+}
 
-// chrome.storage.local.set({ token: "user-123" });
-// in extension console do - chrome.storage.local.get(null, console.log);
-// tokens should be extension scoped so that other websites cant access them
-// 
+const tabsQuery = chromePromise(chrome.tabs.query);
+const storageGet = chromePromise(chrome.storage.local.get);
 
 
 
-// async function getNotesForUrlAndFile(url, file) {
-//     const db = await openDB();
-//     const tx = db.transaction(STORE_NAME, "readonly");
-//     const store = tx.objectStore(STORE_NAME);
-
-//     return new Promise(resolve => {
-//         store.getAll().onsuccess = (e) => {
-//             const notes = e.target.result.filter(
-//                 item =>
-//                     item.type === "note" &&
-//                     item.url === url &&
-//                     item.file === file
-//             );
-
-//             // return most recent note (if any)
-//             if (!notes.length) return resolve(null);
-
-//             notes.sort((a, b) => b.timestamp - a.timestamp);
-//             resolve(notes[0]);
-//         };
-//     });
-// }
+*/

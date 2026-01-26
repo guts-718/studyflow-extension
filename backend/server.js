@@ -23,49 +23,51 @@ await mongoose.connect(process.env.MONGO_URI)
     .then(()=> console.log("mongodb connected"))
     .catch(err => console.error(err));
 
-const Highlight = mongoose.model("Highlight", new mongoose.Schema({
+const Items = mongoose.model("Items", new mongoose.Schema({
     userId: String,
     file: String,
     text: String,
     color: String,
     url: String,
     timestamp: Number,
-    clientId: String
+    clientId: String,
+    type: String
 }));
 
-app.post("/sync/highlights", async (req, res) => {
-    const highlights = req.body.highlights;
+// app.post("/sync/items", async (req, res) => {
+//     const highlights = req.body.highlights;
 
-    if (!Array.isArray(highlights)) {
-        return res.status(400).json({ error: "Invalid payload" });
-    }
+//     if (!Array.isArray(highlights)) {
+//         return res.status(400).json({ error: "Invalid payload" });
+//     }
     
-    await Highlight.insertMany(highlights);
-    res.status(200).json({ success: true });
-});
+//     await Highlight.insertMany(highlights);
+//     res.status(200).json({ success: true });
+// });
 
 app.get("/files", async (req, res) => {
-    const files = await Highlight.distinct("file");
+    const files = await Items.distinct("file");
     res.json(files);
 });
 
-app.get("/highlights", authMiddleware, async (req, res) => {
-    const highlights = await Highlight.find({
+app.get("/items", authMiddleware, async (req, res) => {
+    const bodyy = await Items.find({
         userId: req.user.userId
     });
-    res.json(highlights);
+    res.json(bodyy);
 });
 
 
 
-app.post("/sync/highlights", authMiddleware, async (req, res) => {
+app.post("/sync/items", authMiddleware, async (req, res) => {
     const userId = req.user.userId;
-    const highlights = req.body.highlights.map(h => ({
+    console.log("")
+    const bodyy = req.body.items.map(h => ({
         ...h,
         userId
     }));
 
-    await Highlight.insertMany(highlights, { ordered: false });
+    await Items.insertMany(bodyy, { ordered: false });
     res.json({ success: true });
 });
 
