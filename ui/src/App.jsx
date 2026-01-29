@@ -1,10 +1,11 @@
 import React from "react";
 import Router from "./Router";
+import { DataProvider } from "./DataProvider";
 
 export default function App() {
   return (
-    <div>
+     <DataProvider>
       <Router />
-    </div>
+    </DataProvider>
   );
 }

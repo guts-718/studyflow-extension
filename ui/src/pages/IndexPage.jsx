@@ -1,3 +1,10 @@
+//import { useItems } from "../DataProvider";
+import { useItems } from "../useItems";
+
 export default function IndexPage() {
-  return <h1>Index Page</h1>;
+  const { items, loading } = useItems();
+
+  console.log("Items from DB:", items);
+
+  return <h1>Index Page hhehe</h1>;
 }

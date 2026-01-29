@@ -69,6 +69,15 @@ async function getAllItems() {
     });
 }
 
+// chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+//   if (msg.type === "GET_ALL_ITEMS") {
+//     getAllItems().then(items => {
+//       sendResponse({ ok: true, data: items });
+//     });
+//     return true;
+//   }
+// });
+
 
 async function getNotesForUrlAndFile(url, file) {
     const all = await getAllItems();
