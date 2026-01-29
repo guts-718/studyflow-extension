@@ -5,6 +5,8 @@ import { useState } from "react";
 export default function IndexPage() {
   const { items, loading } = useItems();
   const [collapsed, setCollapsed] = useState({});
+  const [query, setQuery] = useState("");
+
 
   function toggleFile(file) {
   setCollapsed(prev => ({
@@ -19,8 +21,17 @@ export default function IndexPage() {
 
   // file -> url -> items
   const grouped = {};
+  function matches(item, query) {
+    const q = (query.length>0 ? query.toLowerCase(): "");
+    return (
+      q === "" || item.file.toLowerCase().includes(q) ||
+      (item.text || item.content || "").toLowerCase().includes(q) ||
+      (item.url && item.url.length>0 && item.url.toLowerCase().includes(q))
+    );
+  }
 
-  items.forEach(item => {
+  items.filter(item => matches(item, query))
+  .forEach(item => {
     if (!grouped[item.file]) {
       grouped[item.file] = {};
     }
@@ -32,9 +43,19 @@ export default function IndexPage() {
     grouped[item.file][item.url].push(item);
   });
 
+ 
+
+
   return (
     <div>
-      <h1>Index Page</h1>
+    <h1>Index Page</h1>
+    <input
+      placeholder="Search notes & files..."
+      value={query}
+      onChange={e => setQuery(e.target.value)}
+      style={{ width: "100%", padding: 8, marginBottom: 12 }}
+    />
+
 
       {Object.entries(grouped).map(([file, urls]) => (
         <div key={file}>
