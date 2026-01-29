@@ -1,3 +1,6 @@
+import { navigate } from "../navigate";
+
+
 const colorMap = {
   red: "#ff4d4d",
   orange: "#ffa500",
@@ -12,8 +15,14 @@ function truncate(text, n = 140) {
   return text.slice(0, n) + "...";
 }
 
-export default function ItemRow({ item }) {
+export default function ItemRow( {item, full=false }) {
   return (
+
+    <div
+    style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}
+    onClick={() => navigate("/item/" + item.id)}
+    >
+
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
     <div
         style={{
@@ -26,7 +35,12 @@ export default function ItemRow({ item }) {
             : colorMap[item.color]
         }}
     />
-    <div>{truncate(item.text || item.content)}</div>
+    <div>{
+        full
+        ? (item.text || item.content)
+        : truncate(item.text || item.content)
+    }</div>
+</div>
 </div>
 
   );

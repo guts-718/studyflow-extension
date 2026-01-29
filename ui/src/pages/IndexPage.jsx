@@ -1,6 +1,7 @@
 import { useItems } from "../useItems";
 import ItemRow from "../components/ItemRow";
 import { useState } from "react";
+import { navigate } from "../navigate";
 
 export default function IndexPage() {
   const { items, loading } = useItems();
@@ -59,16 +60,23 @@ export default function IndexPage() {
 
       {Object.entries(grouped).map(([file, urls]) => (
         <div key={file}>
-          <h2
-            style={{ cursor: "pointer" }}
-            onClick={() => toggleFile(file)}
-          >
-            {collapsed[file] ? "▶" : "▼"} {file} </h2>
+         <h2
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate("/file/" + encodeURIComponent(file))}
+        >
+          {collapsed[file] ? "▶" : "▼"} {file}
+        </h2>
+
 
 
           {!collapsed[file] && Object.entries(urls).map(([url, urlItems]) => (
             <div key={url} style={{ marginLeft: 20 }}>
-              <div>{url}</div>
+              <a href={url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {url}
+              </a>
 
               {urlItems.map(item => (
                 <div key={item.id} style={{ marginLeft: 20 }}>
