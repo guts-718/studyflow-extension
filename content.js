@@ -1,368 +1,327 @@
-let toolbar;
+
+let toolbar = null;
 let activeFile = null;
-let activePage = location.href;
-let savedRange = null;
-const PORT=4109;
-const existingFiles = [
-  "Biology – Cell Division",
-  "DSA – Trees",
-  "OS – Deadlocks"
-];
 
-window.addEventListener("online", syncToCloud);
-
-
-function getToken() {
-    return new Promise((resolve) => {
-        chrome.storage.local.get("token", (res) => {
-            resolve(res.token);
-        });
-    });
+function colorMap(color) {
+  return {
+    red: "#ffcccc",
+    orange: "#ffe0b3",
+    yellow: "#fff3b0"
+  }[color];
 }
-
 
 function bgRequest(message) {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(message, res => {
-            if (!res || !res.ok) reject();
-            else resolve(res.data);
-        });
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, res => {
+      if (!res || !res.ok) reject(res);
+      else resolve(res.data);
     });
+  });
 }
 
 
+function getNodeFromXPath(path) {
+  return document.evaluate(
+    path,
+    document,
+    null,
+    XPathResult.FIRST_ORDERED_NODE_TYPE,
+    null
+  ).singleNodeValue;
+}
 
-document.addEventListener("mousedown", (e) => {
-  if (toolbar && !toolbar.contains(e.target)) {
-    removeToolbar();
+function getXPath(node) {
+  const parts = [];
+  while (node && node.nodeType === Node.ELEMENT_NODE) {
+    let index = 0;
+    let sib = node.previousSibling;
+    while (sib) {
+      if (sib.nodeName === node.nodeName) index++;
+      sib = sib.previousSibling;
+    }
+    parts.unshift(`${node.nodeName}[${index}]`);
+    node = node.parentNode;
   }
-});
+  return "/" + parts.join("/");
+}
 
+function applyHighlightToRange(range, color) {
+  const span = document.createElement("span");
+  span.style.backgroundColor = color;
+  span.style.padding = "2px";
+  span.style.borderRadius = "3px";
 
-
-async function loadFileNames() {
-    try {
-        const files = await bgRequest({
-            type: "GET_FILES"
-        });
-
-        if (files && files.length) {
-            return files;
-        }
-    } catch (e) {
-        console.warn("Failed to load files:", e);
-    }
-
-    // last-resort fallback
-    return ["Biology", "DSA", "OS"];
+  const frag = range.extractContents();
+  span.appendChild(frag);
+  range.insertNode(span);
 }
 
 
+async function saveHighlight(range, text, color) {
+  if (!activeFile) return;
 
-// window.addEventListener("load", () => {
-//     hydrateIndexedDBFromCloud();
-//     syncToCloud();
-// });
+  const data = {
+    id: crypto.randomUUID(),
+    clientId: crypto.randomUUID(),
+    type: "highlight",
+    file: activeFile,
+    url: location.href,
+    text,
+    color,
+    timestamp: Date.now(),
+    syncStatus: "pending",
 
+    startXPath: getXPath(range.startContainer),
+    startOffset: range.startOffset,
+    endXPath: getXPath(range.endContainer),
+    endOffset: range.endOffset
+  };
 
-document.addEventListener("selectionchange", () => {
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-
-    if (!selectedText) return;
-
-    savedRange = selection.getRangeAt(0).cloneRange();
-    const rect = savedRange.getBoundingClientRect();
-
-    showToolbar(rect, selectedText);
-});
-
-
-function applyHighlight(color) {
-    if (!savedRange) return;
-
-    try {
-        const span = document.createElement("span");
-        span.style.backgroundColor = color;
-        span.style.padding = "2px 0";
-        span.style.borderRadius = "3px";
-
-        savedRange.surroundContents(span);
-    } catch (e) {
-        console.warn("Cannot highlight this selection", e);
-        alert("This selection cannot be highlighted yet.");
-    }
-
-    savedRange = null;
+  try {
+    await bgRequest({ type: "SAVE_ITEM", data });
+  } catch (e) {
+    console.error("Save failed", e);
+  }
 }
 
 async function setActiveFileForUrl(url, file) {
-    if(!url)return;
-    await chrome.storage.local.get("activeFileByUrl", res => {
-        const map = res.activeFileByUrl || {};
-        map[url] = file;
-        chrome.storage.local.set({ activeFileByUrl: map });
+  return new Promise(resolve => {
+    chrome.storage.local.get("activeFileByUrl", res => {
+      const map = res.activeFileByUrl || {};
+      map[url] = file;
+      chrome.storage.local.set({ activeFileByUrl: map }, resolve);
     });
+  });
 }
 
-function showToolbar(rect, text) {
+async function loadFileNames() {
+  try {
+    const files = await bgRequest({ type: "GET_FILES" });
+    if (files?.length) return files;
+  } catch {}
+  return [];
+}
+
+
+document.addEventListener("mousedown", e => {
+  if (!toolbar) return;
+
+  // allow toolbar clicks
+  if (toolbar.contains(e.target)) return;
+
+  removeToolbar();
+});
+
+
+document.addEventListener("mouseup", () => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+
+  const text = sel.toString().trim();
+  if (!text) return;
+
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+
+  showToolbar(rect, text, range);
+});
+
+function showToolbar(rect, text, range) {
+  console.log("Toolbar shown");
+
     removeToolbar();
 
-    toolbar = document.createElement("div");
-    toolbar.style.position = "absolute";
-    toolbar.style.top = `${window.scrollY + rect.top - 40}px`;
-    toolbar.style.left = `${window.scrollX + rect.left}px`;
-    toolbar.style.background = "#222";
-    toolbar.style.padding = "6px";
-    toolbar.style.borderRadius = "6px";
-    toolbar.style.display = "flex";
-    toolbar.style.gap = "6px";
-    toolbar.style.zIndex = "555555";
 
-    const colors = [
-        { name: "red", color: "#ff4d4d", bg: "#ffcccc" },
-        { name: "orange", color: "#ffa500", bg: "#ffe0b3" },
-        { name: "yellow", color: "#ffd700", bg: "#fff3b0" }
-    ];
+  toolbar = document.createElement("div");
+  Object.assign(toolbar.style, {
+    position: "absolute",
+    top: `${window.scrollY + rect.top - 40}px`,
+    left: `${window.scrollX + rect.left}px`,
+    background: "#222",
+    padding: "6px",
+    borderRadius: "6px",
+    display: "flex",
+    gap: "6px",
+    zIndex: "999999"
+  });
 
-    colors.forEach(c => {
-        const btn = document.createElement("button");
-        btn.style.width = "20px";
-        btn.style.height = "20px";
-        btn.style.borderRadius = "50%";
-        btn.style.border = "none";
-        btn.style.cursor = "pointer";
-        btn.style.background = c.color;
+  const colors = [
+    { name: "red", c: "#ff4d4d" },
+    { name: "orange", c: "#ffa500" },
+    { name: "yellow", c: "#ffd700" }
+  ];
 
-        btn.onclick = async () => {
-
-            if (!activeFile) {
-                showFileChooser(async (fileName) => {
-                    activeFile = fileName;
-
-                    await setActiveFileForUrl(
-                        location.href,
-                        fileName
-                    );
-
-                    applyHighlight(c.bg);
-                    removeToolbar();
-                    saveAndSync(text, c.name);
-                });
-                return;
-            }
-
-            applyHighlight(c.bg);
-            removeToolbar();
-            saveAndSync(text, c.name);
-        };
-
-        toolbar.appendChild(btn);
+  colors.forEach(({ name, c }) => {
+    const btn = document.createElement("button");
+    Object.assign(btn.style, {
+      width: "20px",
+      height: "20px",
+      borderRadius: "50%",
+      border: "none",
+      background: c,
+      cursor: "pointer"
     });
 
-    document.body.appendChild(toolbar);
-}
+    btn.onmousedown = e => e.stopPropagation();
+    btn.onmouseup = e => e.stopPropagation();
 
+    btn.onclick = async () => {
+        console.log("Color clicked:", name);
+      const handle = async (file) => {
+        activeFile = file;
+        await setActiveFileForUrl(location.href, file);
+        applyHighlightToRange(range, colorMap(name));
+        removeToolbar();
+        saveHighlight(range, text, name);
+      };
 
-
-async function saveAndSync(text, color) {
-    if (!activeFile) {
-        console.warn("saveAndSync called without activeFile");
-        return;
-    }
-
-    const highlightData = {
-        id: crypto.randomUUID(),
-        clientId: crypto.randomUUID(),
-        type: "highlight",
-        file: activeFile,
-        url: location.href,
-        text,
-        color,
-        timestamp: Date.now(),
-        syncStatus: "pending"
+      if (!activeFile) {
+        showFileChooser(handle);
+      } else {
+        handle(activeFile);
+      }
     };
 
-    try {
-        await bgRequest({
-            type: "SAVE_ITEM",
-            data: highlightData
-        });
+    toolbar.appendChild(btn);
+  });
 
-        console.log("Highlight saved:", highlightData);
-    } catch (err) {
-        console.error("Failed to save highlight", err);
-    }
+  document.body.appendChild(toolbar);
 }
 
-
-
-
-
-   
-async function hydrateIndexedDBFromCloud() {
-    if (!navigator.onLine) return;
-
-    try {
-        const cloudHighlights = await authFetch(
-            `http://localhost:${PORT}/highlights`
-        );
-
-        if (!Array.isArray(cloudHighlights)) return;
-
-        for (const h of cloudHighlights) {
-            const exists = await highlightExists(h.clientId);
-            if (!exists) {
-                await persistHighlight({
-                    id: crypto.randomUUID(),
-                    userId: h.userId,
-                    type: h.type,
-                    file: h.file,
-                    text: h.text,
-                    color: h.color,
-                    url: h.url,
-                    timestamp: h.timestamp,
-                    clientId: h.clientId,
-                    syncStatus: "synced"
-                });
-            }
-        }
-
-        console.log("Hydration complete");
-    } catch (err) {
-        console.warn("Hydration failed:", err);
-    }
-}
-
-
-function saveHighlight(text, color) {
-    console.log("FILE:", activeFile);
-    console.log("TEXT:", text);
-    console.log("COLOR:", color);
-    removeToolbar();
+function removeToolbar() {
+  toolbar?.remove();
+  toolbar = null;
 }
 
 async function showFileChooser(onSelect) {
-    const overlay = document.createElement("div");
-    overlay.style.position = "fixed";
-    overlay.style.top = 0;
-    overlay.style.left = 0;
-    overlay.style.height = "100%";
-    overlay.style.width = "100%";
-    overlay.style.background = "rgba(0,0,0,0.4)";
-    overlay.style.zIndex = "99999";
+    console.log("showFileChooser called");
 
-    const modal = document.createElement("div");
-    modal.style.background = "#fff";
-    modal.style.padding = "16px";
-    modal.style.borderRadius = "8px";
-    modal.style.width = "300px";
-    modal.style.margin = "20vh auto";
-    modal.style.display = "flex";
-    modal.style.flexDirection = "column";
-    modal.style.gap = "8px";
+  const overlay = document.createElement("div");
+  Object.assign(overlay.style, {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.4)",
+    zIndex: 999999
+  });
 
-    const input = document.createElement("input");
-    input.placeholder = "Create new file...";
-    input.style.padding = "6px";
+  const modal = document.createElement("div");
+  Object.assign(modal.style, {
+    background: "#fff",
+    padding: "16px",
+    borderRadius: "8px",
+    width: "280px",
+    margin: "20vh auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px"
+  });
 
-    const select = document.createElement("select");
-    select.style.padding = "6px";
+  const input = document.createElement("input");
+  input.placeholder = "Create new file...";
 
-    const defaultOpt = document.createElement("option");
-    defaultOpt.value = "";
-    defaultOpt.textContent = "Select existing file";
-    select.appendChild(defaultOpt);
+  const select = document.createElement("select");
+  select.innerHTML = `<option value="">Select existing file</option>`;
 
-    
-    const files = await loadFileNames();
-
-    files.forEach(f => {
+  const files = await loadFileNames();
+  files.forEach(f => {
     const opt = document.createElement("option");
-    opt.value = f;
-    opt.textContent = f;
+    opt.value = opt.textContent = f;
     select.appendChild(opt);
-    });
-   
+  });
 
-    const btn = document.createElement("button");
-    btn.textContent = "Confirm";
+  const btn = document.createElement("button");
+  btn.textContent = "Confirm";
 
-    btn.onclick = () => {
-        const newFile = input.value.trim();
-        const existingFile = select.value;
-        
-        const finalValue = newFile || (existingFile !== "" ? existingFile : null);
+  btn.onclick = () => {
+    const val = input.value.trim() || select.value;
+    if (!val) return alert("Select or enter a file");
+    overlay.remove();
+    onSelect(val);
+  };
 
-        if (!finalValue) {
-            alert("Select or enter a file name");
-            return;
-        }
+  overlay.onmousedown = e => {
+    if (e.target === overlay) overlay.remove();
+  };
 
-        overlay.remove();
-        onSelect(finalValue);
-    };
-
-    modal.append(input, select, btn);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-    overlay.addEventListener("mousedown", (e) => {
-    if (e.target === overlay) {
-        overlay.remove();
-    }
-    });
-
+  modal.append(input, select, btn);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
-
-
-
-function removeToolbar() {
-    if (toolbar) {
-        toolbar.remove();
-        toolbar = null;
-    }
-}
 
 async function hydratePageHighlights() {
-    try {
-        const items = await bgRequest({
-            type: "GET_ALL_ITEMS"
-        });
+  console.log("HYDRATE START");
 
-        const pageHighlights = items.filter(
-            i => i.type === "highlight" &&
-                 i.url === location.href
+  try {
+    const items = await bgRequest({ type: "GET_ALL_ITEMS" });
+    console.log("ITEMS:", items);
+
+    const pageHighlights = items.filter(
+        i => i.type === "highlight" && i.url === location.href
         );
+        console.log("PAGE HIGHLIGHTS:", pageHighlights);
 
-        pageHighlights.forEach(h => {
-            reapplyHighlight(h);
-        });
+    items
+      .filter(i => i.type === "highlight" && i.url === location.href)
+      .forEach(h => {
+  try {
+    let startNode = getNodeFromXPath(h.startXPath);
+    let endNode = getNodeFromXPath(h.endXPath);
 
-        console.log("Reapplied highlights:", pageHighlights.length);
-    } catch (e) {
-        console.warn("Failed to hydrate highlights", e);
+    // ✅ FALLBACK: search text in page
+    if (!startNode || !endNode) {
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.nodeValue.includes(h.text)) {
+          startNode = node;
+          endNode = node;
+          h.startOffset = node.nodeValue.indexOf(h.text);
+          h.endOffset = h.startOffset + h.text.length;
+          break;
+        }
+      }
     }
+
+    if (!startNode || !endNode) return;
+
+    const r = document.createRange();
+    r.setStart(startNode, h.startOffset);
+    r.setEnd(endNode, h.endOffset);
+
+    applyHighlightToRange(r, colorMap(h.color));
+
+  } catch (e) {
+    console.warn("Reapply failed", e);
+  }
+});
+
+  } catch (e) {
+    console.warn("Hydration failed", e);
+  }
 }
 
-
-function reapplyHighlight(h){
-    const bodyText = document.body.innerHTML;
-    if(!bodyText.includes(h.text))return;
-
-    document.body.innerHTML = document.body.innerHTML.replace(
-        h.text, `<span style="background-color:${colorMap(h.color)};padding:2px;border-radius:3px;">${h.text}</span>`
-    )
-
-    function colorMap(color){
-        return {
-            red: "#ffcccc",
-            orange: "#ffe0b3",
-            yellow: "#fff3b0"
-        }[color];
-    }
-}
+//window.addEventListener("load", hydratePageHighlights);
+setTimeout(hydratePageHighlights, 500);
 
 
 
-window.addEventListener("load", hydratePageHighlights);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -18,8 +18,6 @@ syncToCloud - authenticatedFetch [post] and then markAsSynced
 refreshAccessToken
 
 
-
-
 */
 const PORT=4109;
 const DB_NAME = "study_highlighter_db";
@@ -53,7 +51,7 @@ async function saveItem(item) {
 
 async function getFilesFromCloud() {
     const res = await authenticatedFetch(
-        "http://localhost:4109/files"
+        `http://localhost:${PORT}/files`
     );
     return res.json();
 }
@@ -68,15 +66,6 @@ async function getAllItems() {
         store.getAll().onsuccess = e => resolve(e.target.result);
     });
 }
-
-// chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-//   if (msg.type === "GET_ALL_ITEMS") {
-//     getAllItems().then(items => {
-//       sendResponse({ ok: true, data: items });
-//     });
-//     return true;
-//   }
-// });
 
 
 async function getNotesForUrlAndFile(url, file) {
@@ -167,7 +156,7 @@ async function syncPendingItemsToCloud() {
     if (!pending.length) return;
 
     const res = await authenticatedFetch(
-        "http://localhost:4109/sync/items",
+        `http://localhost:${4109}/sync/items`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -276,18 +265,3 @@ function setInStorage(obj) {
 }
 
 
-
-
-
-/*
-
-
-
-
-fetch("/protected-endpoint", {
-    headers: {
-        Authorization: "Bearer " + token
-    }
-});
-
-*/

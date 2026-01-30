@@ -7,7 +7,7 @@
 // const DB_VERSION = 3;
 // const STORE_NAME = "items";
 
-/* ---------- IndexedDB helpers ---------- */
+/*  IndexedDB helpers  */
 function bgRequest(message) {
     return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage(message, res => {
@@ -35,7 +35,7 @@ async function getAllItems() {
     });
 }
 
-/* ---------- Rendering ---------- */
+/*  Rendering */
 
 function groupByFileAndUrl(items) {
     const grouped = {};
@@ -87,7 +87,7 @@ function render(grouped) {
     });
 }
 
-/* ---------- Init ---------- */
+/* Init  */
 
 (async function init() {
     const allItems = await getAllItems();

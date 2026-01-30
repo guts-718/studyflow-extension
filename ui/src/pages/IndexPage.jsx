@@ -43,7 +43,7 @@ function getDomain(url) {
 
 
   if (loading) return <h1>Loading...</h1>;
-  console.log("Items from DB:", items);
+  //console.log("Items from DB:", items);
 
   // file -> url -> items
   const grouped = {};
@@ -89,7 +89,7 @@ function getDomain(url) {
 
 
 
-      {Object.entries(grouped).map(([file, urls]) => (
+      {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([file, urls]) => (
         <div key={file}  className="mb-4 bg-white rounded-lg shadow-sm p-3">
           <Collapsible open={!collapsed[file]}>
           <div className="flex items-center gap-2 select-none">

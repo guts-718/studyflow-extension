@@ -140,7 +140,7 @@ async function initNotes() {
     await loadFileOptions();
 
     const tab = await getActiveTab().then((x)=>x.url)
-    console.log("tab:", tab);
+    //console.log("tab:", tab);
 
     if (!tab) {
         console.error("Could not get active tab");
@@ -148,7 +148,7 @@ async function initNotes() {
     }
 
     const pageUrl = tab;
-    console.log("pageUrl:", pageUrl);
+    //console.log("pageUrl:", pageUrl);
     urlDisplay.textContent = formatPageTitle(pageUrl);
 
     // 2️⃣ Load activeFileByUrl
@@ -170,7 +170,7 @@ async function initNotes() {
             url: pageUrl,
             file: existingFile
         });
-        console.log("notes for this url file....", notes);
+       // console.log("notes for this url file....", notes);
 
         // need to handle below thing since space is limited populating doesn't make much sense
         // if (notes.length > 0) {
