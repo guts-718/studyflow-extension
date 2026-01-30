@@ -170,10 +170,12 @@ async function initNotes() {
             url: pageUrl,
             file: existingFile
         });
+        console.log("notes for this url file....", notes);
 
-        if (notes.length > 0) {
-            noteInput.value = notes[0].content;
-        }
+        // need to handle below thing since space is limited populating doesn't make much sense
+        // if (notes.length > 0) {
+        //     noteInput.value = notes[0].text;
+        // }
     }
 
     // 4️⃣ Save note
@@ -206,6 +208,7 @@ async function initNotes() {
         });
 
         console.log("Note saved:", note);
+        window.close();
     };
 
     // 5️⃣ Clear note

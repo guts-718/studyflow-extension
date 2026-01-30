@@ -1,113 +1,149 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Study Highlighter</title>
+<head>
+  <meta charset="UTF-8" />
+  <title>StudyFlow</title>
 
-    <style>
-      body {
-        font-family: sans-serif;
-        margin: 10px;
-        width: 260px;
-      }
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 280px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f6f8;
+    }
 
-      h3 {
-        margin-bottom: 10px;
-      }
+    .popup-root {
+      padding: 12px;
+    }
 
-      input,
-      textarea {
-        width: 100%;
-        box-sizing: border-box;
-        font-family: sans-serif;
-        font-size: 12px;
-        margin-bottom: 8px;
-      }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
 
-      textarea {
-        height: 100px;
-      }
+    h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
 
-      #urlDisplay {
-        font-size: 11px;
-        color: #555;
-        margin-bottom: 6px;
-        word-break: break-all;
-      }
+    input,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
 
-      .buttons {
-        display: flex;
-        gap: 8px;
-      }
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #4f8cff;
+    }
 
-      button {
-        flex: 1;
-        padding: 6px 8px;
-        border: none;
-        cursor: pointer;
-        border-radius: 4px;
-      }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
 
-      #submitBtn {
-        background-color: #2196f3;
-        color: white;
-      }
+    #urlDisplay {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
 
-      #saveButton {
-        background-color: #4caf50;
-        color: white;
-      }
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
 
-      #clearButton {
-        background-color: #f44336;
-        color: white;
-      }
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
 
-      #status {
-        margin-top: 6px;
-        font-size: 11px;
-        color: #333;
-        min-height: 14px;
-      }
+    button {
+      flex: 1;
+      padding: 7px 8px;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 13px;
+    }
 
-      .radio-group {
-        display: flex;
-        gap: 10px;
-        font-size: 12px;
-        margin-bottom: 8px;
-      }
-    </style>
-  </head>
+    button:hover {
+      opacity: 0.9;
+    }
 
-  <body>
-    <h3>Study Highlighter</h3>
+    #submitBtn {
+      background: #4f8cff;
+      color: white;
+    }
 
-    <!-- AUTH UI -->
-    <div id="authContainer">
-      <input id="email" placeholder="Email" />
-      <input id="password" type="password" placeholder="Password" />
+    #saveButton {
+      background: #4caf50;
+      color: white;
+    }
 
-      <div class="radio-group">
-        <label>
-          <input type="radio" name="mode" value="login" checked />
-          Login
-        </label>
-        <label>
-          <input type="radio" name="mode" value="signup" />
-          Signup
-        </label>
+    #clearButton {
+      background: #f44336;
+      color: white;
+    }
+
+    #allNotesButton {
+      background: #eeeeee;
+    }
+
+    #status {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #444;
+      min-height: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="popup-root">
+    <div class="card">
+
+      <h3>StudyFlow</h3>
+
+      <!-- AUTH UI -->
+      <div id="authContainer">
+        <input id="email" placeholder="Email" />
+        <input id="password" type="password" placeholder="Password" />
+
+        <div class="radio-group">
+          <label>
+            <input type="radio" name="mode" value="login" checked />
+            Login
+          </label>
+          <label>
+            <input type="radio" name="mode" value="signup" />
+            Signup
+          </label>
+        </div>
+
+        <button id="submitBtn">Continue</button>
       </div>
 
-      <button id="submitBtn">Continue</button>
-    </div>
+      <!-- NOTES UI -->
+      <div id="notesContainer" style="display: none">
 
-    <!-- NOTES UI -->
-    <div id="notesContainer" style="display: none">
-      <!-- Current page URL -->
-      <div id="urlDisplay"></div>
+        <!-- Current page -->
+        <div id="urlDisplay"></div>
 
-      <!-- File selection / display -->
-      <div class="file-row">
+        <!-- File selector -->
         <input
           id="fileInput"
           list="fileOptions"
@@ -115,26 +151,28 @@
           placeholder="Select or create file"
         />
         <datalist id="fileOptions"></datalist>
+
+        <!-- Notes -->
+        <textarea
+          id="noteInput"
+          placeholder="Write notes for this page..."
+        ></textarea>
+
+        <!-- Buttons -->
+        <div class="buttons">
+          <button id="saveButton">Save</button>
+          <button id="clearButton">Clear</button>
+          <button id="allNotesButton">All Notes</button>
+        </div>
+
       </div>
 
+      <div id="status"></div>
 
-      <!-- Notes input -->
-      <textarea
-        id="noteInput"
-        placeholder="Write notes for this page..."
-      ></textarea>
-
-      <!-- Action buttons -->
-      <div class="buttons">
-        <button id="saveButton">Save</button>
-        <button id="clearButton">Clear</button>
-        <button id="allNotesButton">All Notes</button>
-      </div>
     </div>
+  </div>
 
-
-    <p id="status"></p>
-    <script src="db.js"></script>
-    <script src="popup.js"></script>
-  </body>
+  <script src="db.js"></script>
+  <script src="popup.js"></script>
+</body>
 </html>

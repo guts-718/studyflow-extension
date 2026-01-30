@@ -32,6 +32,11 @@ function bgRequest(message) {
 
 
 
+document.addEventListener("mousedown", (e) => {
+  if (toolbar && !toolbar.contains(e.target)) {
+    removeToolbar();
+  }
+});
 
 
 
@@ -301,6 +306,12 @@ async function showFileChooser(onSelect) {
     modal.append(input, select, btn);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
+    overlay.addEventListener("mousedown", (e) => {
+    if (e.target === overlay) {
+        overlay.remove();
+    }
+    });
+
 }
 
 
