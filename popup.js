@@ -15,6 +15,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+async function loadFileOptions() {
+  const files = await bgRequest({ type: "GET_FILES" });
+  const list = document.getElementById("fileOptions");
+
+  list.innerHTML = "";
+
+  files.forEach(f => {
+    const opt = document.createElement("option");
+    opt.value = f;
+    list.appendChild(opt);
+  });
+}
+
+
 
 function bgRequest(message) {
     return new Promise((resolve, reject) => {
@@ -23,6 +37,30 @@ function bgRequest(message) {
             else resolve(res.data);
         });
     });
+}
+
+
+function formatPageTitle(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace("www.", "");
+
+    // Google search
+    if (host.includes("google.") && u.searchParams.get("q")) {
+      return `${host} — search: ${u.searchParams.get("q")}`;
+    }
+
+    // Wikipedia
+    if (host.includes("wikipedia.org")) {
+      const title = u.pathname.split("/").pop().replace(/_/g, " ");
+      return `${host} — ${decodeURIComponent(title)}`;
+    }
+
+    // Default
+    return host;
+  } catch {
+    return url;
+  }
 }
 
 
@@ -99,6 +137,8 @@ async function initNotes() {
     const allNotesButton = document.getElementById("allNotesButton");
 
     // 1️⃣ Get active tab
+    await loadFileOptions();
+
     const tab = await getActiveTab().then((x)=>x.url)
     console.log("tab:", tab);
 
@@ -109,7 +149,7 @@ async function initNotes() {
 
     const pageUrl = tab;
     console.log("pageUrl:", pageUrl);
-    urlDisplay.textContent = pageUrl;
+    urlDisplay.textContent = formatPageTitle(pageUrl);
 
     // 2️⃣ Load activeFileByUrl
     const result = await new Promise(resolve => {
@@ -170,8 +210,10 @@ async function initNotes() {
 
     // 5️⃣ Clear note
     clearButton.onclick = async () => {
+        noteInput.value = "";
         const file = fileInput.value.trim();
         if (!file) return;
+
 
         await bgRequest({
             type: "DELETE_NOTES_FOR_URL_FILE",
@@ -179,7 +221,7 @@ async function initNotes() {
             file
         });
 
-        noteInput.value = "";
+        
     };
 
     // 6️⃣ Open all notes

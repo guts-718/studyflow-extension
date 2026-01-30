@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "../components/ui/input";
 
@@ -16,6 +16,14 @@ export default function IndexPage() {
   const [collapsed, setCollapsed] = useState({});
   const [query, setQuery] = useState("");
 
+
+    useEffect(() => {
+    const initial = {};
+    items.forEach(item => {
+      initial[item.file] = true;
+    });
+    setCollapsed(initial);
+  }, [items]);
 
   function toggleFile(file) {
   setCollapsed(prev => ({
