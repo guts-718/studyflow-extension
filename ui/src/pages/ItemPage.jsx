@@ -1,4 +1,5 @@
 import { useItems } from "../useItems";
+import { ArrowLeft } from "lucide-react";
 
 export default function ItemPage() {
   const id = window.location.hash.split("/")[2];
@@ -11,30 +12,71 @@ export default function ItemPage() {
   }
 
   return (
-    <div>
-      <button onClick={() => window.history.back()}>
-        ← Back
-      </button>
+    <div className="space-y-4">
+<div className="max-w-2xl">
 
-      <h3>File: {item.file}</h3>
+  {/* Back */}
+  <button
+    onClick={() => window.history.back()}
+    className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer mb-4"
+  >
+    <ArrowLeft size={16} />
+    Back
+    </button>
 
-      <div style={{ margin: "8px 0" }}>
-        Color: {item.type === "note" ? "note" : item.color}
-      </div>
+  {/* Card */}
+  <div className="bg-white rounded-lg shadow-sm p-5 space-y-4">
 
-      <div style={{ marginTop: 12 }}>
-        {item.text || item.content}
-      </div>
+    {/* Metadata */}
+    <div className="flex items-center gap-3 text-sm text-gray-500">
 
-      <div style={{ marginTop: 12 }}>
-        <a href={item.url} target="_blank">
-          Open Source
-        </a>
-      </div>
+      <span className="px-2 py-0.5 bg-gray-100 rounded">
+        {item.file}
+      </span>
 
-      <div style={{ marginTop: 12, fontSize: 12 }}>
+      <span
+        className={`w-2.5 h-2.5 rounded-full ${
+          item.type === "note"
+            ? "bg-blue-400"
+            : item.color === "red"
+            ? "bg-red-400"
+            : item.color === "orange"
+            ? "bg-orange-400"
+            : "bg-yellow-300"
+        }`}
+      />
+
+      {/* <span>
+        {item.type === "note" ? "Note" : item.color}
+      </span> */}
+
+    </div>
+
+    {/* Text */}
+    <div className="text-base leading-relaxed">
+      {item.text || item.content}
+    </div>
+
+    {/* Footer */}
+    <div className="flex justify-between items-center text-sm text-gray-500">
+
+      <a
+        href={item.url}
+        target="_blank"
+        className="text-blue-600 hover:underline"
+      >
+        Open Source
+      </a>
+
+      <div>
         {new Date(item.timestamp).toLocaleString()}
       </div>
+
     </div>
+
+  </div>
+</div>
+
+</div>
   );
 }

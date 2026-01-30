@@ -1,6 +1,14 @@
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { Input } from "../components/ui/input";
+
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent
+} from "../components/ui/collapsible";
 import { useItems } from "../useItems";
 import ItemRow from "../components/ItemRow";
-import { useState } from "react";
 import { navigate } from "../navigate";
 
 export default function IndexPage() {
@@ -14,6 +22,15 @@ export default function IndexPage() {
     ...prev,
     [file]: !prev[file]
   }));
+    }
+
+
+function getDomain(url) {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
 }
 
 
@@ -49,42 +66,72 @@ export default function IndexPage() {
 
   return (
     <div>
-    <h1>Index Page</h1>
-    <input
-      placeholder="Search notes & files..."
-      value={query}
-      onChange={e => setQuery(e.target.value)}
-      style={{ width: "100%", padding: 8, marginBottom: 12 }}
-    />
+    <h1 className="text-2xl font-bold mb-4">
+      StudyFlow
+    </h1>
+    <div className="sticky top-0 pt-2 mb-4">
+      <Input
+        placeholder="Search notes & files..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+    </div>
+
+
+
 
 
       {Object.entries(grouped).map(([file, urls]) => (
-        <div key={file}>
-         <h2
-          style={{ cursor: "pointer" }}
-          onClick={() => navigate("/file/" + encodeURIComponent(file))}
-        >
-          {collapsed[file] ? "▶" : "▼"} {file}
-        </h2>
+        <div key={file}  className="mb-4 bg-white rounded-lg shadow-sm p-3">
+          <Collapsible open={!collapsed[file]}>
+          <div className="flex items-center gap-2 select-none">
+            <CollapsibleTrigger>
+                <div
+                  className="cursor-pointer"
+                  onClick={() => toggleFile(file)}
+                >
+
+                {collapsed[file] ? (
+                  <ChevronRight size={16} />
+                ) : (
+                  <ChevronDown size={16} />
+                )}
+              </div>
+            </CollapsibleTrigger>
+
+            <h2
+              className="font-semibold cursor-pointer hover:underline"
+              onClick={() => navigate("/file/" + encodeURIComponent(file))}
+            >
+              {file}
+            </h2>
+
+        </div>
 
 
+            <CollapsibleContent>
+              {Object.entries(urls).map(([url, urlItems]) => (
+                <div key={url} className="ml-4 mt-3">
+                  <a
+                      href={url}
+                      target="_blank"
+                      title={url}
+                      className="text-blue-500 text-sm hover:underline"
+                    >
+                      {getDomain(url)}
+                    </a>
 
-          {!collapsed[file] && Object.entries(urls).map(([url, urlItems]) => (
-            <div key={url} style={{ marginLeft: 20 }}>
-              <a href={url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {url}
-              </a>
 
-              {urlItems.map(item => (
-                <div key={item.id} style={{ marginLeft: 20 }}>
-                  <ItemRow item={item} />
+                  {urlItems.map(item => (
+                    <div key={item.id} className="ml-4">
+                      <ItemRow item={item} />
+                    </div>
+                  ))}
                 </div>
               ))}
-            </div>
-          ))}
+            </CollapsibleContent>
+          </Collapsible>
+
         </div>
       ))}
     </div>
