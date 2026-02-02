@@ -1,13 +1,3 @@
-// const DB_NAME = "study_highlighter_db";
-// const DB_VERSION = 2;
-// const STORE_NAME = "Highlights";
-
-
-// const DB_NAME="study_highlighter_db";
-// const DB_VERSION = 3;
-// const STORE_NAME = "items";
-
-/*  IndexedDB helpers  */
 function bgRequest(message) {
     return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage(message, res => {
@@ -87,7 +77,6 @@ function render(grouped) {
     });
 }
 
-/* Init  */
 
 (async function init() {
     const allItems = await getAllItems();

@@ -136,7 +136,7 @@ async function initNotes() {
     const clearButton = document.getElementById("clearButton");
     const allNotesButton = document.getElementById("allNotesButton");
 
-    // 1️⃣ Get active tab
+    // 1️ Get active tab
     await loadFileOptions();
 
     const tab = await getActiveTab().then((x)=>x.url)
@@ -151,7 +151,7 @@ async function initNotes() {
     //console.log("pageUrl:", pageUrl);
     urlDisplay.textContent = formatPageTitle(pageUrl);
 
-    // 2️⃣ Load activeFileByUrl
+    // 2️ Load activeFileByUrl
     const result = await new Promise(resolve => {
         chrome.storage.local.get("activeFileByUrl", resolve);
     });
@@ -160,10 +160,10 @@ async function initNotes() {
 
     const existingFile = activeFileByUrl[pageUrl];
     if (existingFile) {
-        fileInput.value = existingFile;   // ✅ correct
+        fileInput.value = existingFile;   //  correct
     }
-
-    // 3️⃣ Load existing note
+    let existingNodeId=null;
+    // 3️ Load existing note
     if (existingFile) {
         const notes = await bgRequest({
             type: "GET_NOTES_FOR_URL_FILE",
@@ -173,12 +173,13 @@ async function initNotes() {
        // console.log("notes for this url file....", notes);
 
         // need to handle below thing since space is limited populating doesn't make much sense
-        // if (notes.length > 0) {
-        //     noteInput.value = notes[0].text;
-        // }
+        if (notes) {
+            noteInput.value = notes.text;
+            existingNodeId = notes.id;
+        }
     }
 
-    // 4️⃣ Save note
+    // 4️ Save note
     saveButton.onclick = async () => {
         const file = fileInput.value.trim();
         const text = noteInput.value.trim();
@@ -192,7 +193,7 @@ async function initNotes() {
         await chrome.storage.local.set({ activeFileByUrl });
 
         const note = {
-            id: crypto.randomUUID(),
+            id: existingNodeId || crypto.randomUUID(),
             clientId: crypto.randomUUID(),
             type: "note",
             file,
@@ -211,7 +212,7 @@ async function initNotes() {
         window.close();
     };
 
-    // 5️⃣ Clear note
+    // 5️ Clear note
     clearButton.onclick = async () => {
         noteInput.value = "";
         const file = fileInput.value.trim();
@@ -227,16 +228,13 @@ async function initNotes() {
         
     };
 
-    // 6️⃣ Open all notes
+    // 6 Open all notes
     allNotesButton.onclick = () => {
         chrome.tabs.create({
             url: chrome.runtime.getURL("notes.html")
         });
     };
 }
-
-
-
 
 function showAuthUI() {
     document.getElementById("authContainer").style.display = "block";
@@ -257,19 +255,3 @@ async function getOrCreateDeviceId() {
     await chrome.storage.local.set({ deviceId });
     return deviceId;
 }
-
-/*
-Chrome extension APIs are mostly callback-based, not promise-based (unless you use polyfills).
-function chromePromise(fn) {
-    return (...args) =>
-        new Promise(resolve =>
-            fn(...args, resolve)
-        );
-}
-
-const tabsQuery = chromePromise(chrome.tabs.query);
-const storageGet = chromePromise(chrome.storage.local.get);
-
-
-
-*/

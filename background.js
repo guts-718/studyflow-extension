@@ -1,24 +1,3 @@
-// await something(); // this crashes service worker - error = Service worker registration failed. Status code: 15
-// const token = await new Promise(resolve => { chrome.storage.local.get("accessToken", res => resolve(res.accessToken));}); - this caused the creash
-// background have auth, fetch and refresh
-
-/*
-from content.js
-const DB_NAME="study_highlighter_db";
-const DB_VERSION = 2;
-const STORE_NAME="Highlights";
-
-PORT=4209
-
-*
-
-/*
-authenticatedFetch - getFromStorage, refreshAccessToken
-syncToCloud - authenticatedFetch [post] and then markAsSynced
-refreshAccessToken
-
-
-*/
 const PORT=4109;
 const DB_NAME = "study_highlighter_db";
 const DB_VERSION = 3;
@@ -67,16 +46,16 @@ async function getAllItems() {
     });
 }
 
-
 async function getNotesForUrlAndFile(url, file) {
-    const all = await getAllItems();
+  const all = await getAllItems();
 
-    return all.filter(i =>
-        i.type === "note" &&
-        i.url === url &&
-        i.file === file
-    );
+  return all.find(i =>
+    i.type === "note" &&
+    i.url === url &&
+    i.file === file
+  ) || null;
 }
+
 
 
 async function deleteNotesForUrlAndFile(url, file) {
@@ -115,8 +94,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         if (msg.type === "GET_NOTES_FOR_URL_FILE") {
-            const notes = await getNotesForUrlAndFile(msg.url, msg.file);
-            sendResponse({ ok: true, data: notes });
+            const note = await getNotesForUrlAndFile(msg.url, msg.file);
+            sendResponse({ ok: true, data: note });
         }
 
         if (msg.type === "DELETE_NOTES_FOR_URL_FILE") {

@@ -4,12 +4,22 @@ let activeFile = null;
 
 function colorMap(color) {
   return {
-    red: "#ffcccc",
-    orange: "#ffe0b3",
-    yellow: "#fff3b0"
+    red: "#ff6b6b",    
+    orange: "#ffa94d", 
+    yellow: "#ffd43b"   
   }[color];
 }
 
+/*  SOFTER VERSION
+function colorMap(color) {
+  return {
+    red: "#ff8787",
+    orange: "#ffc078",
+    yellow: "#ffe066"
+  }[color];
+}
+
+*/
 function bgRequest(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, res => {
