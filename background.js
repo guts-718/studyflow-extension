@@ -71,6 +71,9 @@ async function getNotesForUrlAndFile(url, file) {
 
 
 
+
+
+
 async function deleteNotesForUrlAndFile(url, file) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
@@ -99,6 +102,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
 
             sendResponse({ ok: true });
+        }
+        if (msg.type === "GET_ACTIVE_FILE_MAP") {
+            chrome.storage.local.get("activeFileByUrl", res => {
+                sendResponse({ ok: true, data: res.activeFileByUrl || {} });
+            });
+            return true;
         }
 
         if (msg.type === "GET_ALL_ITEMS") {

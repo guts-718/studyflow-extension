@@ -128,6 +128,118 @@ function getActiveTab() {
 
 
 
+// async function initNotes() {
+//     const urlDisplay = document.getElementById("urlDisplay");
+//     const noteInput = document.getElementById("noteInput");
+//     const fileInput = document.getElementById("fileInput");
+//     const saveButton = document.getElementById("saveButton");
+//     const clearButton = document.getElementById("clearButton");
+//     const allNotesButton = document.getElementById("allNotesButton");
+
+//     // 1️ Get active tab
+//     await loadFileOptions();
+
+//     const tab = await getActiveTab().then((x)=>x.url)
+//     //console.log("tab:", tab);
+
+//     if (!tab) {
+//         console.error("Could not get active tab");
+//         return;
+//     }
+//     const pageUrl = location.origin + location.pathname;
+//     //const pageUrl = tab;
+//     //console.log("pageUrl:", pageUrl);
+//     urlDisplay.textContent = formatPageTitle(pageUrl);
+
+//     // 2️ Load activeFileByUrl
+//     const result = await new Promise(resolve => {
+//         chrome.storage.local.get("activeFileByUrl", resolve);
+//     });
+
+//     const activeFileByUrl = result.activeFileByUrl || {};
+
+//     const existingFile = activeFileByUrl[pageUrl];
+//     if (existingFile) {
+//         fileInput.value = existingFile;   //  correct
+//     }
+//     let existingNodeId=null;
+//     // 3️ Load existing note
+//     if (existingFile) {
+//         const notes = await bgRequest({
+//             type: "GET_NOTES_FOR_URL_FILE",
+//             url: pageUrl,
+//             file: existingFile
+//         });
+//        // console.log("notes for this url file....", notes);
+
+//         // need to handle below thing since space is limited populating doesn't make much sense
+//         if (notes) {
+//             noteInput.value = notes.text;
+//             existingNodeId = notes.id;
+//         }
+//     }
+
+//     // 4️ Save note
+//     saveButton.onclick = async () => {
+//         const file = fileInput.value.trim();
+//         const text = noteInput.value.trim();
+
+//         if (!file) {
+//             alert("Please enter a file name");
+//             return;
+//         }
+//         await bgRequest({
+//             type: "SET_ACTIVE_FILE",
+//             url: pageUrl,
+//             file
+//             });
+
+//         activeFileByUrl[pageUrl] = file;
+//         await chrome.storage.local.set({ activeFileByUrl });
+
+//         const note = {
+//             id: existingNodeId || crypto.randomUUID(),
+//             clientId: crypto.randomUUID(),
+//             type: "note",
+//             file,
+//             url: pageUrl,
+//             text,
+//             timestamp: Date.now(),
+//             syncStatus: "pending"
+//         };
+
+//         await bgRequest({
+//             type: "SAVE_ITEM",
+//             data: note
+//         });
+
+//         console.log("Note saved:", note);
+//         window.close();
+//     };
+
+//     // 5️ Clear note
+//     clearButton.onclick = async () => {
+//         noteInput.value = "";
+//         const file = fileInput.value.trim();
+//         if (!file) return;
+
+
+//         await bgRequest({
+//             type: "DELETE_NOTES_FOR_URL_FILE",
+//             url: pageUrl,
+//             file
+//         });
+
+        
+//     };
+
+//     // 6 Open all notes
+//     allNotesButton.onclick = () => {
+//         chrome.tabs.create({
+//             url: chrome.runtime.getURL("notes.html")
+//         });
+//     };
+// }
 async function initNotes() {
     const urlDisplay = document.getElementById("urlDisplay");
     const noteInput = document.getElementById("noteInput");
@@ -136,50 +248,47 @@ async function initNotes() {
     const clearButton = document.getElementById("clearButton");
     const allNotesButton = document.getElementById("allNotesButton");
 
-    // 1️ Get active tab
     await loadFileOptions();
 
-    const tab = await getActiveTab().then((x)=>x.url)
-    //console.log("tab:", tab);
+    // 1) Get active tab
+    const tab = await getActiveTab();
+    const pageUrl = tab?.url;
 
-    if (!tab) {
+    if (!pageUrl) {
         console.error("Could not get active tab");
         return;
     }
 
-    const pageUrl = tab;
-    //console.log("pageUrl:", pageUrl);
     urlDisplay.textContent = formatPageTitle(pageUrl);
 
-    // 2️ Load activeFileByUrl
-    const result = await new Promise(resolve => {
-        chrome.storage.local.get("activeFileByUrl", resolve);
+    let existingNodeId = null;
+
+    // 2) Get activeFile map
+    const activeFileMap = await bgRequest({
+        type: "GET_ACTIVE_FILE_MAP"
     });
 
-    const activeFileByUrl = result.activeFileByUrl || {};
+    const activeFile = activeFileMap?.[pageUrl] || null;
 
-    const existingFile = activeFileByUrl[pageUrl];
-    if (existingFile) {
-        fileInput.value = existingFile;   //  correct
+    if (activeFile) {
+        fileInput.value = activeFile;
     }
-    let existingNodeId=null;
-    // 3️ Load existing note
-    if (existingFile) {
-        const notes = await bgRequest({
+
+    // 3) Load note
+    if (activeFile) {
+        const note = await bgRequest({
             type: "GET_NOTES_FOR_URL_FILE",
             url: pageUrl,
-            file: existingFile
+            file: activeFile
         });
-       // console.log("notes for this url file....", notes);
 
-        // need to handle below thing since space is limited populating doesn't make much sense
-        if (notes) {
-            noteInput.value = notes.text;
-            existingNodeId = notes.id;
+        if (note) {
+            noteInput.value = note.text || "";
+            existingNodeId = note.id;
         }
     }
 
-    // 4️ Save note
+    // 4) Save note
     saveButton.onclick = async () => {
         const file = fileInput.value.trim();
         const text = noteInput.value.trim();
@@ -189,8 +298,11 @@ async function initNotes() {
             return;
         }
 
-        activeFileByUrl[pageUrl] = file;
-        await chrome.storage.local.set({ activeFileByUrl });
+        await bgRequest({
+            type: "SET_ACTIVE_FILE",
+            url: pageUrl,
+            file
+        });
 
         const note = {
             id: existingNodeId || crypto.randomUUID(),
@@ -208,16 +320,15 @@ async function initNotes() {
             data: note
         });
 
-        console.log("Note saved:", note);
         window.close();
     };
 
-    // 5️ Clear note
+    // 5) Clear
     clearButton.onclick = async () => {
         noteInput.value = "";
+
         const file = fileInput.value.trim();
         if (!file) return;
-
 
         await bgRequest({
             type: "DELETE_NOTES_FOR_URL_FILE",
@@ -225,10 +336,10 @@ async function initNotes() {
             file
         });
 
-        
+        existingNodeId = null;
     };
 
-    // 6 Open all notes
+    // 6) Open all notes
     allNotesButton.onclick = () => {
         chrome.tabs.create({
             url: chrome.runtime.getURL("notes.html")

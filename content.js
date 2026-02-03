@@ -1,6 +1,8 @@
-
+// global state
 let toolbar = null;
 let activeFile = null;
+let savedRange = null;
+
 
 function colorMap(color) {
   return {
@@ -10,7 +12,20 @@ function colorMap(color) {
   }[color];
 }
 
-/*  SOFTER VERSION
+
+// init
+async function restoreActiveFileForPage() {
+  try {
+    const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+    const pageUrl = location.origin + location.pathname;
+    activeFile = map?.[pageUrl] || activeFile;
+  } catch (e) {
+    console.warn("Could not restore active file", e);
+  }
+}
+
+
+// SOFTER VERSION
 function colorMap(color) {
   return {
     red: "#ff8787",
@@ -19,8 +34,19 @@ function colorMap(color) {
   }[color];
 }
 
-*/
 
+
+function startContent() {
+  restoreActiveFileForPage();
+  hydratePageHighlights();
+  setTimeout(hydratePageHighlights, 1500);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startContent);
+} else {
+  startContent();
+}
 
 
 function bgRequest(message) {
@@ -73,6 +99,10 @@ function applyHighlightToRange(range, color) {
 
 
 async function saveHighlight(range, text, color) {
+
+  const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+  const pageUrl = location.origin + location.pathname;
+  activeFile = map?.[pageUrl] || activeFile;
   if (!activeFile) return;
 
   const data = {
@@ -195,21 +225,31 @@ function showToolbar(rect, text, range) {
     btn.onmouseup = e => e.stopPropagation();
 
     btn.onclick = async () => {
-        console.log("Color clicked:", name);
-      const handle = async (file) => {
-        activeFile = file;
-        await setActiveFileForUrl(location.href, file);
-        applyHighlightToRange(range, colorMap(name));
-        removeToolbar();
-        saveHighlight(range, text, name);
-      };
+    console.log("Color clicked:", name);
 
-      if (!activeFile) {
-        showFileChooser(handle);
-      } else {
-        handle(activeFile);
-      }
+    const pageUrl = location.origin + location.pathname;
+
+    // 🔁 Always fetch latest active file
+    const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+    activeFile = map?.[pageUrl] || null;
+
+    const handle = async (file) => {
+      activeFile = file;
+
+      await setActiveFileForUrl(pageUrl, file);
+
+      applyHighlightToRange(range, colorMap(name));
+      removeToolbar();
+      saveHighlight(range, text, name);
     };
+
+    if (!activeFile) {
+      showFileChooser(handle);
+    } else {
+      handle(activeFile);
+    }
+  };
+
 
     toolbar.appendChild(btn);
   });
@@ -277,6 +317,16 @@ async function showFileChooser(onSelect) {
   document.body.appendChild(overlay);
 }
 
+
+
+
+
+
+
+
+
+
+
 async function hydratePageHighlights() {
   console.log("HYDRATE START");
   //clearAllInjectedHighlights();
@@ -321,6 +371,9 @@ async function hydratePageHighlights() {
   }
 }
 
+
+
+
 async function hydratePageHighlights_old() {
   console.log("HYDRATE START");
   clearAllInjectedHighlights();
@@ -331,12 +384,12 @@ async function hydratePageHighlights_old() {
     console.log("ITEMS:", items);
 
     const pageHighlights = items.filter(
-        i => i.type === "highlight" && i.url === location.href
+        i => i.type === "highlight" && i.url === location.origin + location.pathname
         );
         console.log("PAGE HIGHLIGHTS:", pageHighlights);
 
     items
-      .filter(i => i.type === "highlight" && i.url === location.href)
+      .filter(i => i.type === "highlight" && i.url === location.origin + location.pathname)
       .forEach(h => {
   try {
     let startNode = getNodeFromXPath(h.startXPath);
