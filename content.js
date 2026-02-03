@@ -20,6 +20,9 @@ function colorMap(color) {
 }
 
 */
+
+
+
 function bgRequest(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, res => {
@@ -57,6 +60,8 @@ function getXPath(node) {
 
 function applyHighlightToRange(range, color) {
   const span = document.createElement("span");
+  span.setAttribute("data-studyflow-highlight", "true");
+ 
   span.style.backgroundColor = color;
   span.style.padding = "2px";
   span.style.borderRadius = "3px";
@@ -75,7 +80,7 @@ async function saveHighlight(range, text, color) {
     clientId: crypto.randomUUID(),
     type: "highlight",
     file: activeFile,
-    url: location.href,
+    url: location.origin + location.pathname, // location.href was here
     text,
     color,
     timestamp: Date.now(),
@@ -94,13 +99,21 @@ async function saveHighlight(range, text, color) {
   }
 }
 
+// async function setActiveFileForUrl(url, file) {
+//   return new Promise(resolve => {
+//     chrome.storage.local.get("activeFileByUrl", res => {
+//       const map = res.activeFileByUrl || {};
+//       map[url] = file;
+//       chrome.storage.local.set({ activeFileByUrl: map }, resolve);
+//     });
+//   });
+// }
+
 async function setActiveFileForUrl(url, file) {
-  return new Promise(resolve => {
-    chrome.storage.local.get("activeFileByUrl", res => {
-      const map = res.activeFileByUrl || {};
-      map[url] = file;
-      chrome.storage.local.set({ activeFileByUrl: map }, resolve);
-    });
+  return bgRequest({
+    type: "SET_ACTIVE_FILE",
+    url,
+    file
   });
 }
 
@@ -155,10 +168,16 @@ function showToolbar(rect, text, range) {
     zIndex: "999999"
   });
 
+  /*
+   red: "#ff6b6b",    
+    orange: "#ffa94d", 
+    yellow: "#ffd43b" 
+    */
+
   const colors = [
-    { name: "red", c: "#ff4d4d" },
-    { name: "orange", c: "#ffa500" },
-    { name: "yellow", c: "#ffd700" }
+    { name: "red", c: "#ff6b6b" },
+    { name: "orange", c: "#ffa94d"},
+    { name: "yellow", c: "#ffd43b" }
   ];
 
   colors.forEach(({ name, c }) => {
@@ -258,9 +277,54 @@ async function showFileChooser(onSelect) {
   document.body.appendChild(overlay);
 }
 
-
 async function hydratePageHighlights() {
   console.log("HYDRATE START");
+  //clearAllInjectedHighlights();
+
+  const items = await bgRequest({ type: "GET_ALL_ITEMS" });
+  console.log("items ",items);
+
+  const pageUrl = location.origin + location.pathname;
+
+  const highlights = items.filter(
+    i => i.type === "highlight" && i.url === pageUrl
+  );
+  
+  console.log("highlights ", highlights);
+
+  for (const h of highlights) {
+    try {
+      let node = null;
+      let start = -1;
+
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT
+      );
+
+      while ((node = walker.nextNode())) {
+        const idx = node.nodeValue.indexOf(h.text);
+        if (idx !== -1) {
+          start = idx;
+          break;
+        }
+      }
+
+      if (!node) continue;
+
+      const r = document.createRange();
+      r.setStart(node, start);
+      r.setEnd(node, start + h.text.length);
+
+      applyHighlightToRange(r, colorMap(h.color));
+    } catch {}
+  }
+}
+
+async function hydratePageHighlights_old() {
+  console.log("HYDRATE START");
+  clearAllInjectedHighlights();
+
 
   try {
     const items = await bgRequest({ type: "GET_ALL_ITEMS" });
@@ -315,8 +379,55 @@ async function hydratePageHighlights() {
   }
 }
 
-//window.addEventListener("load", hydratePageHighlights);
-setTimeout(hydratePageHighlights, 500);
+
+function clearAllInjectedHighlights() {
+  document.querySelectorAll("[data-studyflow-highlight]")
+    .forEach(el => {
+      const parent = el.parentNode;
+      while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el);
+      }
+      parent.removeChild(el);
+    });
+}
+
+
+
+
+let hydrateTimer = null;
+
+window.addEventListener("resize", () => {
+  clearTimeout(hydrateTimer);
+  hydrateTimer = setTimeout(() => {
+    hydratePageHighlights();
+  }, 300);
+});
+
+
+function startHydration() {
+  hydratePageHighlights();
+
+  // Retry once more after layout settles
+  setTimeout(hydratePageHighlights, 1500);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startHydration);
+} else {
+  startHydration();
+}
+
+
+// window.addEventListener("load", hydratePageHighlights);
+// setTimeout(hydratePageHighlights, 500);
+// const observer = new MutationObserver(() => {
+//   hydratePageHighlights();
+// });
+
+// observer.observe(document.body, {
+//   childList: true,
+//   subtree: true
+// });
 
 
 
@@ -331,7 +442,18 @@ setTimeout(hydratePageHighlights, 500);
 
 
 
+/*
+async function setActiveFileForUrl(url, file) {
+  return new Promise(resolve => {
+    chrome.storage.local.get("activeFileByUrl", res => {
 
-
-
-
+      
+function bgRequest(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, res => {
+      if (!res || !res.ok) reject(res);
+      else resolve(res.data);
+    });
+  });
+} 
+      */

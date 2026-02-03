@@ -21,6 +21,19 @@ function openDB() {
     });
 }
 
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "SET_ACTIVE_FILE") {
+    chrome.storage.local.get("activeFileByUrl", res => {
+      const map = res.activeFileByUrl || {};
+      map[msg.url] = msg.file;
+      chrome.storage.local.set({ activeFileByUrl: map }, () => {
+        sendResponse({ ok: true });
+      });
+    });
+    return true;
+  }
+});
+
 
 async function saveItem(item) {
     const db = await openDB();
