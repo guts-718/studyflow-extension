@@ -307,7 +307,18 @@ async function initNotes() {
         });
         let idd=existingNodeId;
         if(file!==initial_file){
-            idd=crypto.randomUUID();
+            const note = await bgRequest({
+                type: "GET_NOTES_FOR_URL_FILE",
+                url: pageUrl,
+                file: file
+            });
+
+            if (note) {
+                // noteInput.value = note.text || "";
+                idd = note.id;
+            }else{
+                idd=crypto.randomUUID();
+            } 
         }
 
         const note = {
