@@ -80,12 +80,33 @@ if (document.readyState === "loading") {
 }
 
 
-function bgRequest(message) {
+function bgRequest_old(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, res => {
       if (!res || !res.ok) reject(res);
       else resolve(res.data);
     });
+  });
+}
+
+function bgRequest(message) {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(message, res => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+          return;
+        }
+
+        if (!res || !res.ok) {
+          reject(res);
+        } else {
+          resolve(res.data);
+        }
+      });
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 
