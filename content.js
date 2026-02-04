@@ -31,11 +31,26 @@ async function restoreActiveFileForPage() {
   }
 }
 
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ")        // collapse spaces
+    .replace(/[^\p{L}\p{N} ]/gu, ""); // remove punctuation
+}
 
-function makeHighlightId(pageUrl, startXPath, text) {
-  const len = text.length;
-  const norm = text.trim().toLowerCase().slice(0, Math.min(30, len));
+function makeHighlightKey(pageUrl, startXPath, text) {
+  const norm = normalizeText(text).slice(0, 200);
   return `${pageUrl}|${startXPath}|${norm}`;
+}
+
+
+async function hashString(str) {
+  const bytes = new TextEncoder().encode(str);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hashBuffer)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 
@@ -121,14 +136,13 @@ async function saveHighlight(range, text, color) {
   activeFile = map?.[pageUrl] || activeFile;
   if (!activeFile) return;
 
-    const highlightId = makeHighlightId(
-    pageUrl,
-    getXPath(range.startContainer),
-    text
-  );
+    const rawKey = makeHighlightKey(pageUrl, getXPath(range.startContainer), text);
+    const id = await hashString(rawKey);
+
+ 
 
   const data = {
-    id: highlightId,
+    id,
     clientId: crypto.randomUUID(),
     type: "highlight",
     file: activeFile,
@@ -148,7 +162,7 @@ async function saveHighlight(range, text, color) {
     
     const existing = await bgRequest({
       type: "GET_HIGHLIGHT_BY_ID",
-      id: highlightId
+      id,
     });
 
     if (existing) {

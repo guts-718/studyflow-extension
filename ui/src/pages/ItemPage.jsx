@@ -2,9 +2,12 @@ import { useItems } from "../useItems";
 import { ArrowLeft } from "lucide-react";
 
 export default function ItemPage() {
+  console.log("window hash: ", window.location.hash);
   const id = window.location.hash.split("/")[2];
-  const { items } = useItems();
 
+  const { items } = useItems();
+  console.log("items: ",items);
+  console.log("id: ",id);
   const item = items.find(i => i.id === id);
 
   if (!item) {
