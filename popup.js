@@ -321,6 +321,9 @@ async function initNotes() {
                 idd=crypto.randomUUID();
             } 
         }
+        if(!idd){
+            idd=crypto.randomUUID();
+        }
 
         const note = {
             id: idd,

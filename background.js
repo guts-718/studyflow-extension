@@ -1,6 +1,6 @@
 const PORT=4109;
 const DB_NAME = "study_highlighter_db";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_NAME = "items";
 
 
@@ -38,6 +38,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 async function saveItem(item) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
+    console.log("item to store in the indexedDB: ", item, " store name ",STORE_NAME);
     tx.objectStore(STORE_NAME).put(item);
 }
 
