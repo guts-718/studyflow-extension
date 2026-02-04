@@ -2,6 +2,7 @@ const PORT=4109
 const API_BASE = `http://localhost:${PORT}`;
 let initial_file=null;
 
+
 document.addEventListener("DOMContentLoaded", async () => {
     const { accessToken } = await chrome.storage.local.get("accessToken");
 

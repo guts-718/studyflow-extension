@@ -142,6 +142,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
         }
 
+        if (msg.type === "GET_HIGHLIGHT_BY_ID") {
+            const id = msg.id;
+        openDB().then(db => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const store = tx.objectStore(STORE_NAME);
+
+                const req = store.get(id);
+
+                req.onsuccess = () => {
+                sendResponse({
+                    ok: true,
+                    data: req.result || null
+                });
+                };
+
+                req.onerror = () => {
+                sendResponse({
+                    ok: false,
+                    error: req.error?.message
+                });
+                };
+            });
+
+            return true; // async response
+            }
+
+
 
 
     })();

@@ -12,6 +12,13 @@ function colorMap(color) {
   }[color];
 }
 
+const COLOR_PRIORITY = {
+  red: 3,
+  orange: 2,
+  yellow: 1
+};
+
+
 
 // init
 async function restoreActiveFileForPage() {
@@ -23,6 +30,15 @@ async function restoreActiveFileForPage() {
     console.warn("Could not restore active file", e);
   }
 }
+
+
+function makeHighlightId(pageUrl, startXPath, text) {
+  const len = text.length;
+  const norm = text.trim().toLowerCase().slice(0, Math.min(30, len));
+  return `${pageUrl}|${startXPath}|${norm}`;
+}
+
+
 
 
 // SOFTER VERSION
@@ -105,8 +121,14 @@ async function saveHighlight(range, text, color) {
   activeFile = map?.[pageUrl] || activeFile;
   if (!activeFile) return;
 
+    const highlightId = makeHighlightId(
+    pageUrl,
+    getXPath(range.startContainer),
+    text
+  );
+
   const data = {
-    id: crypto.randomUUID(),
+    id: highlightId,
     clientId: crypto.randomUUID(),
     type: "highlight",
     file: activeFile,
@@ -123,6 +145,20 @@ async function saveHighlight(range, text, color) {
   };
 
   try {
+    
+    const existing = await bgRequest({
+      type: "GET_HIGHLIGHT_BY_ID",
+      id: highlightId
+    });
+
+    if (existing) {
+      console.log("similar data already present: ", data);
+      if (COLOR_PRIORITY[color] <= COLOR_PRIORITY[existing.color]) {
+        console.log("old one has better color",existing.color,"compared to", color);
+        return; // weaker or equal → ignore
+      }
+    } 
+
     await bgRequest({ type: "SAVE_ITEM", data });
   } catch (e) {
     console.error("Save failed", e);
@@ -229,7 +265,7 @@ function showToolbar(rect, text, range) {
 
     const pageUrl = location.origin + location.pathname;
 
-    // 🔁 Always fetch latest active file
+    // Always fetch latest active file
     const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
     activeFile = map?.[pageUrl] || null;
 
@@ -469,6 +505,9 @@ if (document.readyState === "loading") {
 } else {
   startHydration();
 }
+
+
+
 
 
 // window.addEventListener("load", hydratePageHighlights);
