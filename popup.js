@@ -1,5 +1,6 @@
 const PORT=4109
 const API_BASE = `http://localhost:${PORT}`;
+let initial_file=null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const { accessToken } = await chrome.storage.local.get("accessToken");
@@ -247,7 +248,7 @@ async function initNotes() {
     const saveButton = document.getElementById("saveButton");
     const clearButton = document.getElementById("clearButton");
     const allNotesButton = document.getElementById("allNotesButton");
-
+   
     await loadFileOptions();
 
     // 1) Get active tab
@@ -272,6 +273,7 @@ async function initNotes() {
 
     if (activeFile) {
         fileInput.value = activeFile;
+        initial_file=activeFile;
     }
 
     // 3) Load note
@@ -303,9 +305,13 @@ async function initNotes() {
             url: pageUrl,
             file
         });
+        let idd=existingNodeId;
+        if(file!==initial_file){
+            idd=crypto.randomUUID();
+        }
 
         const note = {
-            id: existingNodeId || crypto.randomUUID(),
+            id: idd,
             clientId: crypto.randomUUID(),
             type: "note",
             file,
