@@ -548,8 +548,11 @@ async function hydratePageHighlights() {
       if (range) {
         applyHighlightToRange(range, colorMap(h.color));
       }
+      console.log("text done: ", h.text);
 
-    } catch {}
+    } catch(e){
+      console.log("error during hydration: ", e);
+    }
   }
 }
 
