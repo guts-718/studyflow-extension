@@ -18,6 +18,49 @@ const COLOR_PRIORITY = {
   yellow: 1
 };
 
+function findRangeByAnchors(text) {
+  const prefix = text.slice(0, 25).trim();
+  const suffix = text.slice(-25).trim();
+
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  let startNode = null;
+  let startOffset = -1;
+
+  let endNode = null;
+  let endOffset = -1;
+
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!startNode) {
+      const i = node.nodeValue.indexOf(prefix);
+      if (i !== -1) {
+        startNode = node;
+        startOffset = i;
+      }
+    }
+
+    const j = node.nodeValue.indexOf(suffix);
+    if (j !== -1) {
+      endNode = node;
+      endOffset = j + suffix.length;
+    }
+
+    if (startNode && endNode) break;
+  }
+
+  if (!startNode || !endNode) return null;
+
+  const r = document.createRange();
+  r.setStart(startNode, startOffset);
+  r.setEnd(endNode, endOffset);
+  return r;
+}
+
 
 function findTextRangeBySearch(text) {
   const walker = document.createTreeWalker(
@@ -164,9 +207,9 @@ function getXPath(node) {
 
 function applyHighlightToRange(range, color) {
   // below early return is just jugad
-  // if (range.startContainer.parentNode.tagName === "SPAN") {
-  //   return;
-  // }
+  if (range.startContainer.parentNode.tagName === "SPAN") {
+    return;
+  }
 
   const span = document.createElement("span");
   span.setAttribute("data-studyflow-highlight", "true");
@@ -454,27 +497,27 @@ async function hydratePageHighlights() {
   );
   highlights.sort((a, b) => b.text.length - a.text.length);
 
-  console.log("highlights ", highlights);
+  console.log("highlights after sorting: ", highlights);
 
   for (const h of highlights) {
     try {
-      let node = null;
-      let start = -1;
+      // let node = null;
+      // let start = -1;
 
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT
-      );
+      // const walker = document.createTreeWalker(
+      //   document.body,
+      //   NodeFilter.SHOW_TEXT
+      // );
 
-      while ((node = walker.nextNode())) {
-        const idx = node.nodeValue.indexOf(h.text);
-        if (idx !== -1) {
-          start = idx;
-          break;
-        }
-      }
+      // while ((node = walker.nextNode())) {
+      //   const idx = node.nodeValue.indexOf(h.text);
+      //   if (idx !== -1) {
+      //     start = idx;
+      //     break;
+      //   }
+      // }
 
-      if (!node) continue;
+      // if (!node) continue;
 
       // const r = document.createRange();
       // r.setStart(node, start);
@@ -485,19 +528,21 @@ async function hydratePageHighlights() {
 
       let range = null;
 
-      try {
-        const s = getNodeFromXPath(h.startXPath);
-        const e = getNodeFromXPath(h.endXPath);
+      // try {
+      //   const s = getNodeFromXPath(h.startXPath);
+      //   const e = getNodeFromXPath(h.endXPath);
 
-        if (s && e) {
-          range = document.createRange();
-          range.setStart(s.firstChild || s, h.startOffset);
-          range.setEnd(e.firstChild || e, h.endOffset);
-        }
-      } catch {}
+      //   if (s && e) {
+      //     range = document.createRange();
+      //     range.setStart(s.firstChild || s, h.startOffset);
+      //     range.setEnd(e.firstChild || e, h.endOffset);
+      //   }
+      // } catch {}
 
       if (!range) {
-        range = findTextRangeBySearch(h.text);
+        range = findRangeByAnchors(h.text);
+        
+        console.log("text: ", h.text, "       range from anchors: ", range);
       }
 
       if (range) {
