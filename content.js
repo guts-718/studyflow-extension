@@ -540,7 +540,12 @@ async function hydratePageHighlights() {
       // } catch {}
 
       if (!range) {
-        range = findRangeByAnchors(h.text);
+        if(h.text.trim.length> 40){
+          range = findRangeByAnchors(h.text);
+        }else{
+          range=findTextRangeBySearch(h.text);
+        }
+        
         
         console.log("text: ", h.text, "       range from anchors: ", range);
       }
