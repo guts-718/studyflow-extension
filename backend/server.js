@@ -74,6 +74,20 @@ app.post("/sync/items", authMiddleware, async (req, res) => {
     res.json({ success: true });
 });
 
+app.get("/sync/items", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const items = await Items.find({ userId }).lean();
+
+    res.json(items);
+  } catch (err) {
+    console.error("Fetch items failed:", err);
+    res.status(500).json({ error: "Failed to fetch items" });
+  }
+});
+
+
 
 
 app.post("/auth/signup", async (req, res) => {

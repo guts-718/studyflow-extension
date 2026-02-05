@@ -17,6 +17,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+async function hydrateFromCloud() {
+  try {
+    const items = await bgRequest({
+      type: "AUTH_FETCH",
+      url: "http://localhost:4109/sync/items",
+      options: { method: "GET" }
+    });
+    console.log("items for user: ", items);
+    if (!Array.isArray(items)) return;
+
+    for (const item of items) {
+      await bgRequest({
+        type: "SAVE_ITEM",
+        data: {
+          ...item,
+          id: item.id || item._id,   // CRUCIAL
+          syncStatus: "synced"
+        }
+      });
+    }
+
+    console.log("Hydrated", items.length, "items");
+  } catch (e) {
+    console.warn("Hydration failed", e);
+  }
+}
+
+
 async function loadFileOptions() {
   const files = await bgRequest({ type: "GET_FILES" });
   const list = document.getElementById("fileOptions");
@@ -107,7 +135,7 @@ function initAuth() {
                 refreshToken: data.refreshToken
             });
 
-
+            await hydrateFromCloud();
             // Switch UI instead of closing popup
             showNotesUI();
             initNotes();

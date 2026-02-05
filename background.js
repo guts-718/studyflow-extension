@@ -39,6 +39,10 @@ async function saveItem(item) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
     console.log("item to store in the indexedDB: ", item, " store name ",STORE_NAME);
+    if (!item.id && item._id) {
+       item.id = item._id;
+    }
+    console.log("Saving item:", item.id);
     tx.objectStore(STORE_NAME).put(item);
 }
 
@@ -262,6 +266,7 @@ async function refreshAccessToken() {
     await setInStorage({ accessToken });
     return accessToken;
 }
+
 
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
