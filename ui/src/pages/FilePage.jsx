@@ -8,7 +8,10 @@ export default function FilePage() {
     window.location.hash.split("/")[2]
   );
 
+  console.log("file: ",file);
+
   const { items } = useItems();
+  console.log("items: ",items);
 
   const fileItems = items.filter(i => i.file === file);
 
@@ -20,6 +23,53 @@ export default function FilePage() {
     }
     grouped[item.url].push(item);
     });
+  function exportFile(fileName, items, format = "md") {
+        let output = "";
+
+        if (format === "md") {
+          output += `# ${fileName}\n\n`;
+
+          items.forEach(i => {
+            output += `---\n\n`;
+            output += `## 🔗 ${i.url}\n\n`;
+
+            if (i.type === "highlight") {
+              output += `### 🔴 Highlight\n${i.text}\n\n`;
+            } else {
+              output += `### 📝 Note\n${i.text}\n\n`;
+            }
+          });
+        }
+
+        if (format === "txt") {
+          output += `FILE: ${fileName}\n\n`;
+
+          items.forEach(i => {
+            output += `URL: ${i.url}\n`;
+
+            if (i.type === "highlight") {
+              output += `[HIGHLIGHT]\n${i.text}\n\n`;
+            } else {
+              output += `[NOTE]\n${i.text}\n\n`;
+            }
+          });
+        }
+
+        downloadFile(output, `${fileName}.${format}`);
+      }
+
+      function downloadFile(content, filename) {
+          const blob = new Blob([content], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+
+          URL.revokeObjectURL(url);
+        }
+
 
   return (
     <div className="space-y-4 cursor-pointer">
@@ -31,6 +81,11 @@ export default function FilePage() {
         <ArrowLeft size={16} />
         Back
       </button>
+      <button onClick={() => exportFile(file, fileItems, "md")}
+        className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer">
+        Export
+      </button>
+
 
       </div>
 
