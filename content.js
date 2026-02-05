@@ -19,17 +19,43 @@ const COLOR_PRIORITY = {
 };
 
 
+function findTextRangeBySearch(text) {
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  const needle = text.trim();
+  let node;
+
+  while ((node = walker.nextNode())) {
+    const idx = node.nodeValue.indexOf(needle);
+    if (idx !== -1) {
+      const r = document.createRange();
+      r.setStart(node, idx);
+      r.setEnd(node, idx + needle.length);
+      return r;
+    }
+  }
+
+  return null;
+}
+
+
 
 // init
 async function restoreActiveFileForPage() {
-  try {
-    const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
-    const pageUrl = location.origin + location.pathname;
-    activeFile = map?.[pageUrl] || activeFile;
-  } catch (e) {
-    console.warn("Could not restore active file", e);
+  let map = {};
+try {
+      const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+      const pageUrl = location.origin + location.pathname;
+      activeFile = map?.[pageUrl] || activeFile;
+    } catch (e) {
+      map = {};
+      console.warn("Could not restore active file", e);
+    }
   }
-}
 
 function normalizeText(text) {
   return text
@@ -137,6 +163,11 @@ function getXPath(node) {
 }
 
 function applyHighlightToRange(range, color) {
+  // below early return is just jugad
+  // if (range.startContainer.parentNode.tagName === "SPAN") {
+  //   return;
+  // }
+
   const span = document.createElement("span");
   span.setAttribute("data-studyflow-highlight", "true");
  
@@ -151,13 +182,17 @@ function applyHighlightToRange(range, color) {
 
 
 async function saveHighlight(range, text, color) {
-
-  const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+ let map = {};
+  try {
+    map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+  } catch {
+    map = {};
+  }
   const pageUrl = location.origin + location.pathname;
   activeFile = map?.[pageUrl] || activeFile;
   if (!activeFile) return;
 
-    const rawKey = makeHighlightKey(pageUrl, getXPath(range.startContainer), text);
+    const rawKey = makeHighlightKey(pageUrl, getXPath(range.startContainer), normalizeText(text).slice(0, 25));
     const id = await hashString(rawKey);
 
  
@@ -301,7 +336,13 @@ function showToolbar(rect, text, range) {
     const pageUrl = location.origin + location.pathname;
 
     // Always fetch latest active file
-    const map = await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+   // const map =
+    let map = {};
+    try {
+      map =  await bgRequest({ type: "GET_ACTIVE_FILE_MAP" });
+    } catch {
+      map = {};
+    }
     activeFile = map?.[pageUrl] || null;
 
     const handle = async (file) => {
@@ -392,17 +433,18 @@ async function showFileChooser(onSelect) {
 
 
 
-
-
-
-
-
-
 async function hydratePageHighlights() {
   console.log("HYDRATE START");
   //clearAllInjectedHighlights();
+  let map = {};
+  try {
+    map = await bgRequest({ type: "GET_ALL_ITEMS" });
+  } catch {
+    map = {};
+  }
 
-  const items = await bgRequest({ type: "GET_ALL_ITEMS" });
+  //const items = await bgRequest({ type: "GET_ALL_ITEMS" });
+  const items=map;
   console.log("items ",items);
 
   const pageUrl = location.origin + location.pathname;
@@ -410,7 +452,8 @@ async function hydratePageHighlights() {
   const highlights = items.filter(
     i => i.type === "highlight" && i.url === pageUrl
   );
-  
+  highlights.sort((a, b) => b.text.length - a.text.length);
+
   console.log("highlights ", highlights);
 
   for (const h of highlights) {
@@ -433,11 +476,34 @@ async function hydratePageHighlights() {
 
       if (!node) continue;
 
-      const r = document.createRange();
-      r.setStart(node, start);
-      r.setEnd(node, start + h.text.length);
+      // const r = document.createRange();
+      // r.setStart(node, start);
+      // r.setEnd(node, start + h.text.length);
 
-      applyHighlightToRange(r, colorMap(h.color));
+      // applyHighlightToRange(r, colorMap(h.color));
+
+
+      let range = null;
+
+      try {
+        const s = getNodeFromXPath(h.startXPath);
+        const e = getNodeFromXPath(h.endXPath);
+
+        if (s && e) {
+          range = document.createRange();
+          range.setStart(s.firstChild || s, h.startOffset);
+          range.setEnd(e.firstChild || e, h.endOffset);
+        }
+      } catch {}
+
+      if (!range) {
+        range = findTextRangeBySearch(h.text);
+      }
+
+      if (range) {
+        applyHighlightToRange(range, colorMap(h.color));
+      }
+
     } catch {}
   }
 }
@@ -466,7 +532,7 @@ async function hydratePageHighlights_old() {
     let startNode = getNodeFromXPath(h.startXPath);
     let endNode = getNodeFromXPath(h.endXPath);
 
-    // ✅ FALLBACK: search text in page
+    // FALLBACK: search text in page
     if (!startNode || !endNode) {
       const walker = document.createTreeWalker(
         document.body,
