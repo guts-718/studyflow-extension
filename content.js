@@ -268,7 +268,7 @@ async function saveHighlight(range, text, color) {
       console.log("similar data already present: ", data);
       if (COLOR_PRIORITY[color] <= COLOR_PRIORITY[existing.color]) {
         console.log("old one has better color",existing.color,"compared to", color);
-        return; // weaker or equal → ignore
+        return; // weaker or equal -> ignore
       }
     } 
 
