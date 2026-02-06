@@ -1,5 +1,7 @@
 import { useItems } from "../useItems";
 import { ArrowLeft } from "lucide-react";
+import { Download } from "lucide-react";
+
 
 export default function ItemPage() {
   console.log("window hash: ", window.location.hash);

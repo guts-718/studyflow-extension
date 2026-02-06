@@ -1,6 +1,7 @@
 import { useItems } from "../useItems";
 import ItemRow from "../components/ItemRow";
 import { ArrowLeft } from "lucide-react";
+import { Download } from "lucide-react";
 
 
 export default function FilePage() {
@@ -73,7 +74,8 @@ export default function FilePage() {
 
   return (
     <div className="space-y-4 cursor-pointer">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center justify-between mb-4">
+      
        <button
         onClick={() => window.history.back()}
         className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer"
@@ -82,10 +84,20 @@ export default function FilePage() {
         Back
       </button>
       <button onClick={() => exportFile(file, fileItems, "md")}
-        className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer">
+          className="
+        flex items-center gap-2
+        bg-blue-600 text-white
+        px-4 py-2 rounded-md
+        text-sm font-medium
+        shadow-sm
+        hover:bg-blue-700
+        active:scale-[0.98]
+        transition
+      "
+    >
+      <Download size={16} />
         Export
       </button>
-
 
       </div>
 

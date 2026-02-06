@@ -1,6 +1,8 @@
 import { useState,useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "../components/ui/input";
+import { Download } from "lucide-react";
+
 
 import {
   Collapsible,
@@ -17,8 +19,9 @@ export default function IndexPage() {
   const [query, setQuery] = useState("");
 
 
-    useEffect(() => {
+  useEffect(() => {
     const initial = {};
+    //setAllItems(items);
     items.forEach(item => {
       initial[item.file] = true;
     });
@@ -43,7 +46,6 @@ function getDomain(url) {
 
 
   if (loading) return <h1>Loading...</h1>;
-  //console.log("Items from DB:", items);
 
   // file -> url -> items
   const grouped = {};
@@ -69,14 +71,104 @@ function getDomain(url) {
     grouped[item.file][item.url].push(item);
   });
 
- 
 
+ function slugify(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-");
+}
+
+function exportGrouped(groupedData, format = "md") {
+  let output = "";
+
+  if (format === "md") {
+    output += `# 📚 StudyFlow Notes\n\n`;
+    output += `## 📂 Files Index\n`;
+    Object.keys(groupedData).forEach(file => {
+      output += `- [${file}](#${slugify(file)})\n`;
+    });
+    output += `\n---\n\n`;
+
+    Object.entries(groupedData).forEach(([file, urls]) => {
+      output += `## ${file}\n\n`;
+
+      Object.entries(urls).forEach(([url, items]) => {
+        output += `### 🔗 ${url}\n`;
+
+        items.forEach(i => {
+          if (i.type === "highlight") {
+            output += `**🔴 Highlight**\n${i.text}\n\n`;
+          } else {
+            output += `**📝 Note**\n${i.text}\n\n`;
+          }
+        });
+
+        output += `---\n\n`;
+      });
+    });
+  }
+
+  if (format === "txt") {
+    Object.entries(groupedData).forEach(([file, urls]) => {
+      output += `FILE: ${file}\n\n`;
+
+      Object.entries(urls).forEach(([url, items]) => {
+        output += `URL: ${url}\n`;
+
+        items.forEach(i => {
+          if (i.type === "highlight") {
+            output += `[HIGHLIGHT]\n${i.text}\n\n`;
+          } else {
+            output += `[NOTE]\n${i.text}\n\n`;
+          }
+        });
+      });
+    });
+  }
+
+  downloadFile(output, `notes.${format}`);
+}
+
+
+
+
+      function downloadFile(content, filename) {
+          const blob = new Blob([content], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+
+          URL.revokeObjectURL(url);
+        }
 
   return (
-    <div>
-    <h1 className="text-2xl font-bold mb-4">
-      StudyFlow
-    </h1>
+<div>
+<div className="flex items-center justify-between mb-4">
+  <h1 className="text-2xl font-bold">
+    StudyFlow
+  </h1>
+
+    <button
+      onClick={() => exportGrouped(grouped, "md")}
+      className="
+        flex items-center gap-2
+        bg-blue-600 text-white
+        px-4 py-2 rounded-md
+        text-sm font-medium
+        shadow-sm
+        hover:bg-blue-700
+        active:scale-[0.98]
+        transition
+      "
+    >
+      <Download size={16} />
+      Export All Notes
+  </button>
+  </div>
     <div className="sticky top-0 pt-2 mb-4">
       <Input
         placeholder="Search notes & files..."
