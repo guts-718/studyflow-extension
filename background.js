@@ -21,6 +21,17 @@ function openDB() {
     });
 }
 
+(async function initLocalUser() {
+  const { localUserId } = await chrome.storage.local.get("localUserId");
+
+  if (!localUserId) {
+    await chrome.storage.local.set({
+      localUserId: crypto.randomUUID()
+    });
+  }
+})();
+
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "SET_ACTIVE_FILE") {
     chrome.storage.local.get("activeFileByUrl", res => {
@@ -187,6 +198,9 @@ async function syncPendingItemsToCloud() {
     const pending = items.filter(i => i.syncStatus === "pending");
 
     if (!pending.length) return;
+    const { accessToken } = await chrome.storage.local.get("accessToken");
+    if (!accessToken) return;
+
 
     const res = await authenticatedFetch(
         `http://localhost:${4109}/sync/items`,

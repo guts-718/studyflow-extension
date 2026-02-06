@@ -238,7 +238,11 @@ async function saveHighlight(range, text, color) {
     const rawKey = makeHighlightKey(pageUrl, getXPath(range.startContainer), normalizeText(text).slice(0, 25));
     const id = await hashString(rawKey);
 
- 
+  const { userId, localUserId } =
+  await chrome.storage.local.get(["userId", "localUserId"]);
+
+  const owner = userId || localUserId;
+
 
   const data = {
     id,
@@ -250,6 +254,7 @@ async function saveHighlight(range, text, color) {
     color,
     timestamp: Date.now(),
     syncStatus: "pending",
+    userId: owner, // added for local...
 
     startXPath: getXPath(range.startContainer),
     startOffset: range.startOffset,

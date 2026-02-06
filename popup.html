@@ -1,178 +1,264 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>StudyFlow</title>
+<meta charset="UTF-8" />
+<title>StudyFlow</title>
 
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      width: 280px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f5f6f8;
-    }
+<style>
+/* -------- Base -------- */
 
-    .popup-root {
-      padding: 12px;
-    }
+body {
+  margin: 0;
+  padding: 0;
+  width: 280px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f5f6f8;
+}
 
-    .card {
-      background: white;
-      border-radius: 10px;
-      padding: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-    }
+.popup-root { padding: 12px; }
 
-    h3 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-    }
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
 
-    input,
-    textarea {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      font-size: 13px;
-      margin-bottom: 8px;
-    }
+/* -------- Header -------- */
 
-    input:focus,
-    textarea:focus {
-      outline: none;
-      border-color: #4f8cff;
-    }
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
 
-    textarea {
-      min-height: 90px;
-      resize: vertical;
-    }
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
-    #urlDisplay {
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 8px;
-      word-break: break-word;
-    }
+.topbar h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.header-btn {
+  flex: 0 0 auto;
+  width: auto;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: none;
+  background: #eeeeee;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    .radio-group {
-      display: flex;
-      gap: 12px;
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
+#backBtn {
+  width: 26px;
+  padding: 0;
+}
 
-    .buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 6px;
-    }
+#loginButton {
+  margin-left: auto;
+}
 
-    button {
-      flex: 1;
-      padding: 7px 8px;
-      border: none;
-      cursor: pointer;
-      border-radius: 6px;
-      font-size: 13px;
-    }
+.header-btn:hover {
+  background: #e0e0e0;
+}
 
-    button:hover {
-      opacity: 0.9;
-    }
+/* -------- Inputs -------- */
 
-    #submitBtn {
-      background: #4f8cff;
-      color: white;
-    }
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
 
-    #saveButton {
-      background: #4caf50;
-      color: white;
-    }
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #6c8cff;
+}
 
-    #clearButton {
-      background: #f44336;
-      color: white;
-    }
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
 
-    #allNotesButton {
-      background: #eeeeee;
-    }
+/* -------- Notes -------- */
 
-    #status {
-      margin-top: 6px;
-      font-size: 11px;
-      color: #444;
-      min-height: 14px;
-    }
-  </style>
+#urlDisplay {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+
+
+button {
+  flex: 1;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover { opacity: 0.9; }
+
+#saveButton { background:#4caf50; color:white; }
+#clearButton { background:#f44336; color:white; }
+#allNotesButton { background:#eeeeee; }
+
+/* -------- Auth -------- */
+
+#authContainer {
+  display: none;
+  flex-direction: column;
+  height: 200px;
+}
+
+.auth-actions {
+  margin-top: auto;
+  padding-top: 35px;   /* stronger push */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#password {
+  margin-bottom: 20px;
+}
+
+
+.radio-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#submitBtn {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  background:#6c8cff;
+  color:white;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* -------- Status -------- */
+
+#status {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #444;
+  min-height: 14px;
+}
+
+/* #loginButton {
+  padding: 0 10px;
+  font-size: 12px;
+  width: 10px;
+} */
+
+#email {
+  margin-top: 20px;
+}
+
+#loginButton {
+  height: 22px !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+  border-radius: 6px;
+}
+
+</style>
 </head>
 
 <body>
-  <div class="popup-root">
-    <div class="card">
+<div class="popup-root">
+<div class="card">
 
-      <h3>StudyFlow</h3>
+<!-- HEADER -->
+<div class="topbar">
+  <div class="topbar-left">
+    <button id="backBtn" class="header-btn">❮</button>
+    <h3>StudyFlow</h3>
+  </div>
+  <button id="loginButton" class="header-btn">Sync</button>
+</div>
 
-      <!-- AUTH UI -->
-      <div id="authContainer">
-        <input id="email" placeholder="Email" />
-        <input id="password" type="password" placeholder="Password" />
+<!-- AUTH -->
+<div id="authContainer">
 
-        <div class="radio-group">
-          <label>
-            <input type="radio" name="mode" value="login" checked />
-            Login
-          </label>
-          <label>
-            <input type="radio" name="mode" value="signup" />
-            Signup
-          </label>
-        </div>
+  <input id="email" placeholder="username">
+  <input id="password" type="password" placeholder="Password">
 
-        <button id="submitBtn">Continue</button>
-      </div>
-
-      <!-- NOTES UI -->
-      <div id="notesContainer" style="display: none">
-
-        <!-- Current page -->
-        <div id="urlDisplay"></div>
-
-        <!-- File selector -->
-        <input
-          id="fileInput"
-          list="fileOptions"
-          type="text"
-          placeholder="Select or create file"
-        />
-        <datalist id="fileOptions"></datalist>
-
-        <!-- Notes -->
-        <textarea
-          id="noteInput"
-          placeholder="Write notes for this page..."
-        ></textarea>
-
-        <!-- Buttons -->
-        <div class="buttons">
-          <button id="saveButton">Save</button>
-          <button id="clearButton">Clear</button>
-          <button id="allNotesButton">All Notes</button>
-        </div>
-
-      </div>
-
-      <div id="status"></div>
-
+  <div class="auth-actions">
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="mode" value="login" checked>
+        Login
+      </label>
+      <label>
+        <input type="radio" name="mode" value="signup">
+        Signup
+      </label>
     </div>
+
+    <button id="submitBtn">Continue</button>
   </div>
 
-  <script src="db.js"></script>
-  <script src="popup.js"></script>
+</div>
+
+<!-- NOTES -->
+<div id="notesContainer">
+
+  <div id="urlDisplay"></div>
+
+  <input id="fileInput" list="fileOptions"
+         placeholder="Select or create file">
+  <datalist id="fileOptions"></datalist>
+
+  <textarea id="noteInput"
+    placeholder="Write notes for this page..."></textarea>
+
+  <div class="buttons">
+    <button id="saveButton">Save</button>
+    <button id="clearButton">Clear</button>
+    <button id="allNotesButton">All Notes</button>
+  </div>
+
+</div>
+
+<div id="status"></div>
+
+</div>
+</div>
+
+<script src="db.js"></script>
+<script src="popup.js"></script>
 </body>
 </html>

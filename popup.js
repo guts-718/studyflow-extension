@@ -3,19 +3,37 @@ const API_BASE = `http://localhost:${PORT}`;
 let initial_file=null;
 
 
-document.addEventListener("DOMContentLoaded", async () => {
-    const { accessToken } = await chrome.storage.local.get("accessToken");
+// document.addEventListener("DOMContentLoaded", async () => {
+//     const { accessToken } = await chrome.storage.local.get("accessToken");
 
-    if (accessToken) {
+//     if (accessToken) {
         
-        showNotesUI();
-        initNotes();
+//         showNotesUI();
+//         initNotes();
         
-    } else {
-        showAuthUI();
-        initAuth();
-    }
+//     } else {
+//         showAuthUI();
+//         initAuth();
+//     }
+// });
+
+function updateAuthUI() {
+    chrome.storage.local.get("accessToken").then(({ accessToken }) => {
+        const loginBtn = document.getElementById("loginButton");
+        if (!loginBtn) return;
+
+        loginBtn.style.display = accessToken ? "none" : "flex";
+    });
+}
+
+
+document.addEventListener("DOMContentLoaded", async () => {
+    // Always load notes first
+    showNotesUI();
+    initNotes();
+    updateAuthUI();
 });
+
 
 async function hydrateFromCloud() {
   try {
@@ -93,10 +111,40 @@ function formatPageTitle(url) {
   }
 }
 
+async function migrateLocalItemsToAccount() {
+  const { localUserId, userId } =
+    await chrome.storage.local.get(["localUserId", "userId"]);
+
+  if (!localUserId || !userId) return;
+
+  const items = await bgRequest({ type: "GET_ALL_ITEMS" });
+
+  for (const item of items) {
+    if (item.userId === localUserId) {
+      await bgRequest({
+        type: "SAVE_ITEM",
+        data: {
+          ...item,
+          userId,
+          syncStatus: "pending"
+        }
+      });
+    }
+  }
+}
+
+
 
 function initAuth() {
     const submitBtn = document.getElementById("submitBtn");
 
+    const backBtn = document.getElementById("backBtn");
+    if (backBtn) {
+        backBtn.onclick = () => {
+            showNotesUI();
+            initNotes();
+        };
+    }
     submitBtn.addEventListener("click", async () => {
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value.trim();
@@ -134,16 +182,23 @@ function initAuth() {
                 accessToken: data.accessToken,
                 refreshToken: data.refreshToken
             });
+            await chrome.storage.local.set({
+                userId: data.userId
+            });
 
             await hydrateFromCloud();
+            await migrateLocalItemsToAccount();
+
             // Switch UI instead of closing popup
+            updateAuthUI();
             showNotesUI();
             initNotes();
 
         } catch (e) {
             console.error(e);
-            status.textContent = "Something went wrong";
+            status.textContent = "Backend not reachable. You can continue using locally.";
         }
+
     });
 }
 
@@ -157,6 +212,7 @@ function getActiveTab() {
 }
 
 
+
 async function initNotes() {
     const urlDisplay = document.getElementById("urlDisplay");
     const noteInput = document.getElementById("noteInput");
@@ -164,7 +220,7 @@ async function initNotes() {
     const saveButton = document.getElementById("saveButton");
     const clearButton = document.getElementById("clearButton");
     const allNotesButton = document.getElementById("allNotesButton");
-   
+    const loginButton = document.getElementById("loginButton");
     await loadFileOptions();
 
     // 1) Get active tab
@@ -271,6 +327,10 @@ async function initNotes() {
         if(!idd){
             idd=crypto.randomUUID();
         }
+        const { userId, localUserId } =
+        await chrome.storage.local.get(["userId", "localUserId"]);
+
+        const owner = userId || localUserId;
 
         const note = {
             id: idd,
@@ -280,7 +340,8 @@ async function initNotes() {
             url: pageUrl,
             text,
             timestamp: Date.now(),
-            syncStatus: "pending"
+            syncStatus: "pending",
+            userId: owner, // for local
         };
 
         await bgRequest({
@@ -313,16 +374,25 @@ async function initNotes() {
             url: chrome.runtime.getURL("notes.html")
         });
     };
+    
+
+    loginButton.onclick = () => {
+        showAuthUI();
+        initAuth();
+    };
+
 }
 
 function showAuthUI() {
     document.getElementById("authContainer").style.display = "block";
     document.getElementById("notesContainer").style.display = "none";
+    document.getElementById("backBtn").style.display = "flex";
 }
 
 function showNotesUI() {
     document.getElementById("authContainer").style.display = "none";
     document.getElementById("notesContainer").style.display = "block";
+    document.getElementById("backBtn").style.display = "none";
 }
 
 
